@@ -84,7 +84,7 @@ def cmd_check(args: argparse.Namespace, settings: Settings) -> int:
 
 
 def cmd_calibrate(args: argparse.Namespace, settings: Settings) -> int:
-    valid = N.valid_names(args.kind, settings.deploy.troop_slots)
+    valid = N.valid_names(args.kind, N.used_slots(settings))
     if args.name not in valid:
         print(f"Unknown {args.kind} name '{args.name}'. Valid: {', '.join(valid)}")
         return 2

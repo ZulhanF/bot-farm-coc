@@ -46,6 +46,8 @@
   your thresholds, with a cap on how many times it presses *Next*.
 - **Configurable deployment** — troops along calibrated "clock" lines or the map diamond (`v_top`,
   `v_bottom`, `all`), plus siege machine and heroes with automatic ability activation.
+- **Spells** — drops spells such as Rage in front of each deploy wing a few seconds after the troops
+  land, to push them past 50 % faster.
 - **Storage-full check** — reads your own Gold / Elixir before each attack and stops (or waits) when your
   storages are full, so no loot goes to waste.
 - **Self-recovery** — detects popups, stuck screens and lost connections; escalates from *Back* to a full
@@ -130,7 +132,8 @@ on a live screenshot: drag a box, press **Enter** to save, **C** to cancel.
 | `roi` | `gold`, `elixir`, `de` | enemy base preview — only the loot digits, no icon |
 | `roi` | `home_gold`, `home_elixir`, `home_de` | your village, top-right resource counters |
 | `point` | `map_11`, `map_9`, `map_1`, `map_3` | edges of the battlefield for the deploy lines |
-| `point` | `troop_slot_N` | each troop / siege / hero card in the bottom bar |
+| `point` | `troop_slot_N` | each troop / siege / hero / spell card in the bottom bar |
+| `point` | `map_center` | middle of the enemy base — spells aim from the deploy line towards it |
 
 Verify that everything needed by your settings is present, and test detection offline on any screenshot:
 
@@ -152,6 +155,7 @@ Calibration data is written to `calibration.toml` by the `calibrate` command.
 |---|---|
 | `[loot]` | `min_gold`, `min_elixir`, `min_de`, `max_next` — `0` / `0` / `0` / `0` attacks the first base found |
 | `[deploy]` | `pattern`, `points_per_side`, `taps_per_point`, `troop_slots`, `siege_slot`, `hero_slots` |
+| `[spells]` | `slots`, `casts`, `delay_s`, `depth` — `depth = 0` on the deploy line, `1` at `map_center` |
 | `[timing]` | `battle_timeout_s`, `damage_stagnant_s`, `tap_delay_ms`, `tap_jitter_px`, `progress_timeout_s` |
 | `[storage]` | `gold_cap`, `elixir_cap`, `de_cap`, `full_ratio`, `on_full` (`"stop"` / `"wait"`) |
 | `[session]` | `enabled`, `play_minutes`, `break_minutes`, `active_hours`, `max_hours_per_day` |
@@ -163,6 +167,12 @@ Example for quick win farming with a storage check:
 min_gold = 0
 min_elixir = 0
 max_next = 0             # attack the first base: chase the win bonus, not big loot
+
+[spells]
+slots = [6]              # Rage card in slot 6
+casts = 2                # one Rage per wing
+delay_s = 5.0
+depth = 0.35             # just in front of the dragons
 
 [storage]
 gold_cap = 24000000      # your storage capacity

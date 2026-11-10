@@ -306,3 +306,40 @@ def test_attack_recorded_once_with_cycle():
     assert rows[1]["cycle_s"] > 0
     assert rows[0]["preview_gold"] == RICH.gold
     assert "gained_gold" not in rows[0]
+
+
+def with_spells(**kw):
+    s = make_settings()
+    return replace(s, spells=replace(s.spells, **kw))
+
+
+def test_spells_cast_once_after_delay():
+    game = FakeGame([Screen.BASE_PREVIEW] + [Screen.BATTLE] * 6)
+    game.loot = RICH
+    bot, clock = make_bot(game, settings=with_spells(slots=(6,), delay_s=5.0))
+    bot.tick()                      # deploy at t=0
+    for _ in range(2):              # battle ticks at t=0 and t=3
+        bot.tick()
+    assert game.count("cast_spells") == 0
+    for _ in range(4):              # t=6 casts, later ticks do not cast again
+        bot.tick()
+    assert game.count("cast_spells") == 1
+
+
+def test_no_spells_configured_never_casts():
+    game = FakeGame([Screen.BASE_PREVIEW] + [Screen.BATTLE] * 5)
+    game.loot = RICH
+    bot, _ = make_bot(game)
+    for _ in range(6):
+        bot.tick()
+    assert game.count("cast_spells") == 0
+
+
+def test_spells_cast_again_next_attack():
+    game = FakeGame([Screen.BASE_PREVIEW, Screen.BATTLE, Screen.BATTLE, Screen.RESULT,
+                     Screen.BASE_PREVIEW, Screen.BATTLE, Screen.BATTLE])
+    game.loot = RICH
+    bot, _ = make_bot(game, settings=with_spells(slots=(6,), delay_s=1.0))
+    for _ in range(7):
+        bot.tick()
+    assert game.count("cast_spells") == 2

@@ -72,6 +72,7 @@ class Bot:
         self._prev_attack_started: datetime | None = None
         self._preview_loot: Loot | None = None
         self._record_pending = False
+        self._spells_cast = False
         self._stop = False
         self._next_count = 0
         self._battle_started: datetime | None = None
@@ -264,6 +265,7 @@ class Bot:
             self._prev_attack_started = self._attack_started
             self._attack_started = now
             self._record_pending = True
+            self._spells_cast = False
             self._battle_started = now
             self._last_damage = 0
             self._last_damage_time = now
@@ -279,6 +281,8 @@ class Bot:
             self._battle_started = now
             self._last_damage = 0
             self._last_damage_time = now
+
+        self._maybe_cast_spells(now)
 
         ended = False
         damage = self.game.read_damage_percent()
@@ -307,6 +311,17 @@ class Bot:
             self.game.end_battle()
 
         self.sleep(3.0)
+
+    def _maybe_cast_spells(self, now: datetime) -> None:
+        cfg = self.settings.spells
+        if not cfg.slots or self._spells_cast or self._battle_started is None:
+            return
+        if (now - self._battle_started).total_seconds() < cfg.delay_s:
+            return
+        self._spells_cast = True
+        if self.game.cast_spells():
+            log.info("Spells cast (slots %s)", list(cfg.slots))
+            self._last_damage_time = now  # give the spells time before the stagnation check
 
     def _on_result(self, now: datetime) -> None:
         if self._record_pending and self._attack_started is not None:

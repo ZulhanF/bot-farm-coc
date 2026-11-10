@@ -55,3 +55,13 @@ def test_home_roi_required_only_for_capped_resources():
     missing = N.missing_calibration(settings, set(N.REQUIRED_TEMPLATES))
     assert "roi:home_gold" in missing
     assert "roi:home_elixir" not in missing
+
+
+def test_spells_require_center_and_card_points():
+    from dataclasses import replace
+    settings = Settings(calibration=full_calibration())
+    settings = replace(settings, spells=replace(settings.spells, slots=(6,)))
+    missing = N.missing_calibration(settings, set(N.REQUIRED_TEMPLATES))
+    assert missing == ["point:map_center", "point:troop_slot_6"]
+    assert N.used_slots(settings) == (1, 6)
+    assert "map_center" in N.valid_names("point", (1,))

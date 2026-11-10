@@ -150,3 +150,51 @@ def test_read_storage_unreadable_counter_returns_none():
     game.capture()
     assert game.read_storage() is None
 
+
+
+def spell_game(depth=0.5, casts=2, center=(640, 360)):
+    s = make_settings()
+    pts = dict(s.calibration.points, troop_slot_6=(700, 680))
+    if center is not None:
+        pts["map_center"] = center
+    s = replace(s, calibration=replace(s.calibration, points=pts),
+                spells=replace(s.spells, slots=(6,), casts=casts, depth=depth))
+    return make_game(settings=s)
+
+
+def test_spell_targets_sit_between_each_wing_and_center():
+    game, _ = spell_game(depth=0.5)
+    game.capture()
+    game.deploy_army()
+    targets = game.spell_targets()
+    assert len(targets) == len(game.wings) == 4
+    for wing, (x, y) in zip(game.wings, targets):
+        mx = sum(p[0] for p in wing) / len(wing)
+        my = sum(p[1] for p in wing) / len(wing)
+        assert abs(x - (mx + 640) / 2) <= 1 and abs(y - min((my + 360) / 2, 600)) <= 1
+
+
+def test_cast_spells_taps_card_then_alternates_wings():
+    game, adb = spell_game(casts=3)
+    game.capture()
+    game.deploy_army()
+    before = len(adb.taps())
+    targets = game.spell_targets()
+    assert game.cast_spells()
+    taps = adb.taps()[before:]
+    assert len(taps) == 4
+    assert near(taps[0], (700, 680))
+    for tap, target in zip(taps[1:], (targets[0], targets[1], targets[2])):
+        assert near(tap, target)
+
+
+def test_cast_spells_needs_center_and_a_deploy():
+    game, adb = spell_game(center=None)
+    game.capture()
+    game.deploy_army()
+    before = len(adb.taps())
+    assert not game.cast_spells()
+    assert len(adb.taps()) == before
+    fresh, adb2 = spell_game()
+    assert not fresh.cast_spells()   # nothing deployed yet
+    assert adb2.taps() == []

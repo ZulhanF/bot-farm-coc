@@ -39,6 +39,7 @@ class Game:
         self.sleep = sleep
         self.debug_dir = debug_dir
         self.last_image: np.ndarray | None = None
+        self.wings: list[list[Point]] = []  # deploy points of the last attack, one list per side
 
     # --- primitives -------------------------------------------------------
     def capture(self) -> np.ndarray:
@@ -162,11 +163,14 @@ class Game:
             right_targets = line_points(points["map_1"], points["map_3"], d.points_per_side,
                                         self.settings.timing.tap_jitter_px, self.rng, (width, height), d.max_y)
             targets = left_targets + right_targets
+            self.wings = [left_targets, right_targets]
         else:
             corners = [points[name] for name in N.MAP_CORNERS]
             targets = edge_points(corners, d.sides, d.points_per_side, d.outward_px,
                                   self.settings.timing.tap_jitter_px, self.rng, (width, height), d.max_y,
                                   pattern=d.pattern)
+            per = max(d.points_per_side, 1)
+            self.wings = [targets[i:i + per] for i in range(0, len(targets), per)]
         for slot in d.troop_slots:
             slot_name = N.troop_slot(slot)
             if slot_name in points:
@@ -208,6 +212,43 @@ class Game:
                     self.sleep(0.3)
                     self.tap(card_pt)
                     self.sleep(0.2)
+
+    def spell_targets(self) -> list[Point]:
+        """One point per deploy wing, `depth` of the way from the wing's middle towards map_center."""
+        center = self.settings.calibration.points.get(N.MAP_CENTER)
+        if center is None:
+            return []
+        depth = self.settings.spells.depth
+        height, width = self.last_image.shape[:2] if self.last_image is not None else (720, 1280)
+        max_y = min(height - 1, self.settings.deploy.max_y)
+        out: list[Point] = []
+        for wing in self.wings:
+            if not wing:
+                continue
+            mx = sum(p[0] for p in wing) / len(wing)
+            my = sum(p[1] for p in wing) / len(wing)
+            x = mx + (center[0] - mx) * depth
+            y = my + (center[1] - my) * depth
+            out.append((min(max(int(round(x)), 0), width - 1), min(max(int(round(y)), 0), max_y)))
+        return out
+
+    def cast_spells(self) -> bool:
+        """Drop each spell slot `casts` times in front of the deployed troops, alternating wings."""
+        cfg = self.settings.spells
+        points = self.settings.calibration.points
+        targets = self.spell_targets()
+        if not cfg.slots or not targets:
+            return False
+        cast = False
+        for slot in cfg.slots:
+            card = points.get(N.troop_slot(slot))
+            if card is None:
+                continue
+            self.tap(card)
+            for i in range(cfg.casts):
+                self.tap(targets[i % len(targets)])
+            cast = True
+        return cast
 
     def end_battle(self) -> None:
         tapped = self.tap_template(N.BTN_SURRENDER) or self.tap_template(N.BTN_END_BATTLE)

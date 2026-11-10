@@ -132,7 +132,7 @@ class FakeGame:
 
     def __getattr__(self, name):
         if name in {"close_army", "open_attack_menu", "find_match", "next_base",
-                    "deploy_army", "end_battle", "return_home", "dismiss_popup", "go_back",
+                    "deploy_army", "cast_spells", "end_battle", "return_home", "dismiss_popup", "go_back",
                     "reconnect"}:
             return lambda: (self.calls.append(name), name not in self.failing)[1]
         raise AttributeError(name)

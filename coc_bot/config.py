@@ -41,6 +41,14 @@ class DeployConfig:
 
 
 @dataclass(frozen=True)
+class SpellConfig:
+    slots: tuple[int, ...] = ()  # spell card slots (calibrate troop_slot_N); empty = no spells
+    casts: int = 2               # casts per slot, spread over the deploy wings (left, right, ...)
+    delay_s: float = 5.0         # seconds after the troops are deployed
+    depth: float = 0.35          # 0 = on the deploy line, 1 = at map_center (in front of the troops)
+
+
+@dataclass(frozen=True)
 class TimingConfig:
     tap_delay_ms: tuple[int, int] = (120, 350)
     tap_jitter_px: int = 4
@@ -95,6 +103,7 @@ class Settings:
     adb: AdbConfig = field(default_factory=AdbConfig)
     loot: LootConfig = field(default_factory=LootConfig)
     deploy: DeployConfig = field(default_factory=DeployConfig)
+    spells: SpellConfig = field(default_factory=SpellConfig)
     timing: TimingConfig = field(default_factory=TimingConfig)
     session: SessionConfig = field(default_factory=SessionConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
@@ -106,6 +115,7 @@ _SECTIONS: dict[str, type] = {
     "adb": AdbConfig,
     "loot": LootConfig,
     "deploy": DeployConfig,
+    "spells": SpellConfig,
     "timing": TimingConfig,
     "session": SessionConfig,
     "storage": StorageConfig,

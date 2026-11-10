@@ -53,6 +53,7 @@ ROI_LIMITS = {
 # Points: map diamond corners (fully zoomed out) and troop card slots
 MAP_CORNERS = ("map_top", "map_right", "map_bottom", "map_left")
 MAP_CLOCK_POINTS = ("map_11", "map_9", "map_1", "map_3")
+MAP_CENTER = "map_center"           # middle of the enemy base; spells aim from the deploy line towards it
 
 
 def troop_slot(n: int) -> str:
@@ -74,13 +75,22 @@ def required_points(
     return MAP_CORNERS + slot_points
 
 
+def used_slots(settings: Settings) -> tuple[int, ...]:
+    """Every card slot the army uses: troops, heroes, siege and spells."""
+    d = settings.deploy
+    slots = set(d.troop_slots) | set(d.hero_slots) | set(settings.spells.slots)
+    if d.siege_slot > 0:
+        slots.add(d.siege_slot)
+    return tuple(sorted(slots))
+
+
 def valid_names(kind: str, troop_slots: tuple[int, ...]) -> tuple[str, ...]:
     if kind == "template":
         return REQUIRED_TEMPLATES + OPTIONAL_TEMPLATES
     if kind == "roi":
         return REQUIRED_ROIS + OPTIONAL_ROIS
     if kind == "point":
-        return MAP_CLOCK_POINTS + MAP_CORNERS + tuple(troop_slot(n) for n in troop_slots)
+        return MAP_CLOCK_POINTS + MAP_CORNERS + (MAP_CENTER,) + tuple(troop_slot(n) for n in troop_slots)
     raise ValueError(f"Unknown kind: {kind}")
 
 
@@ -108,4 +118,8 @@ def missing_calibration(settings: Settings, template_names: set[str]) -> list[st
         )
         if n not in cal.points
     ]
+    spell_points = (MAP_CENTER,) + tuple(troop_slot(n) for n in settings.spells.slots)
+    if settings.spells.slots:
+        missing += [f"point:{n}" for n in spell_points
+                    if n not in cal.points and f"point:{n}" not in missing]
     return missing
