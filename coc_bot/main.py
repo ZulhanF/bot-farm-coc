@@ -148,22 +148,31 @@ def cmd_run(args: argparse.Namespace, settings: Settings) -> int:
         return 2
     log_path = setup_logging(Path("logs"))
     log.info("Logging to %s", log_path)
-    adb = _connect(settings)
-    shape = adb.screencap().shape[:2]
-    if shape != EXPECTED_SHAPE:
-        log.error("Emulator resolution must be 1280x720, got %dx%d", shape[1], shape[0])
-        return 2
-    rng = random.Random()
-    game = Game(adb, templates, OcrReader(rapidocr_engine()), settings, rng)
-    bot = Bot(game, SessionPolicy(settings.session, rng), settings, rng,
-              clock=datetime.now, sleep=time.sleep)
+    game = bot = None
     try:
+        adb = _connect(settings)
+        shape = adb.screencap().shape[:2]
+        if shape != EXPECTED_SHAPE:
+            log.error("Emulator resolution must be 1280x720, got %dx%d", shape[1], shape[0])
+            return 2
+        rng = random.Random()
+        game = Game(adb, templates, OcrReader(rapidocr_engine()), settings, rng)
+        bot = Bot(game, SessionPolicy(settings.session, rng), settings, rng,
+                  clock=datetime.now, sleep=time.sleep)
         bot.run()
     except KeyboardInterrupt:
-        log.info("Stopped by user (Ctrl+C). %s", bot.stats)
+        log.info("Stopped by user (Ctrl+C).%s", f" {bot.stats}" if bot else "")
     except FatalError as exc:
-        game.save_debug_screenshot("fatal")
-        log.error("Fatal: %s. %s", exc, bot.stats)
+        if game is not None:
+            game.save_debug_screenshot("fatal")
+        log.error("Fatal: %s.%s", exc, f" {bot.stats}" if bot else "")
+        return 1
+    except AdbError:
+        raise
+    except Exception:
+        log.exception("Unexpected error.%s", f" {bot.stats}" if bot else "")
+        if game is not None:
+            game.save_debug_screenshot("crash")
         return 1
     return 0
 
@@ -189,3 +198,6 @@ def main(argv: list[str] | None = None) -> int:
     except AdbError as exc:
         print(f"ADB error: {exc}")
         return 3
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        return 2

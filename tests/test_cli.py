@@ -36,6 +36,16 @@ def test_check_complete(tmp_path, capsys):
     assert "complete" in capsys.readouterr().out.lower()
 
 
+def test_check_unreadable_template_png_returns_2(tmp_path, capsys):
+    tpl = tmp_path / "templates"
+    tpl.mkdir()
+    (tpl / "home_attack.png").write_bytes(b"not a png")
+    settings_cal = Calibration().with_entry("templates", "home_attack", (0, 0, 10, 10))
+    save_calibration(tmp_path / "calibration.toml", settings_cal)
+    assert main(base_args(tmp_path) + ["check"]) == 2
+    assert "Error" in capsys.readouterr().out
+
+
 def test_calibrate_rejects_unknown_name(tmp_path, capsys):
     assert main(base_args(tmp_path) + ["calibrate", "template", "bogus"]) == 2
     assert "Valid" in capsys.readouterr().out
