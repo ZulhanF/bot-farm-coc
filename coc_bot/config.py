@@ -45,6 +45,7 @@ class TimingConfig:
     stuck_timeout_s: int = 60
     army_poll_s: tuple[int, int] = (60, 120)
     max_restarts: int = 3
+    progress_timeout_s: int = 900   # no forward progress for this long -> recover
 
 
 @dataclass(frozen=True)

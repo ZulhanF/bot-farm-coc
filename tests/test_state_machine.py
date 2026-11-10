@@ -128,17 +128,71 @@ def test_stuck_unknown_escalates_to_fatal():
         bot.run(max_ticks=1000)
     assert game.count("go_back") == 1
     assert game.count("restart_game") == 3
-    assert game.count("save_debug_screenshot") >= 1
+    assert game.count("save_debug_screenshot") == 5  # back + 3 restarts + the fatal one; none on entering UNKNOWN
 
 
 def test_progress_screen_resets_escalation():
-    screens = [Screen.UNKNOWN] * 32 + [Screen.HOME] + [Screen.UNKNOWN] * 40
+    screens = ([Screen.UNKNOWN] * 32 + [Screen.HOME, Screen.ATTACK_MENU]
+               + [Screen.UNKNOWN] * 40)
     game = FakeGame(screens)
     bot, _ = make_bot(game, settings=with_timing(stuck_timeout_s=60))
     for _ in range(len(screens)):
         bot.tick()
     assert game.count("go_back") == 2
     assert game.count("restart_game") == 0
+
+
+def test_home_without_forward_progress_trips_watchdog():
+    game = FakeGame([Screen.HOME])  # army ready, open_attack_menu "succeeds", screen never moves
+    bot, clock = make_bot(game, settings=with_timing(progress_timeout_s=900))
+    for _ in range(300):
+        bot.tick()
+    assert game.count("go_back") == 0
+    for _ in range(500):
+        bot.tick()
+    assert game.count("go_back") == 1
+    assert bot.stats.recoveries == 1
+    for _ in range(700):
+        bot.tick()
+    assert game.count("restart_game") >= 1
+
+
+def test_waiting_for_army_does_not_trip_watchdog():
+    game = FakeGame([Screen.HOME], army_ready=False)
+    bot, clock = make_bot(game, settings=with_timing(progress_timeout_s=900))
+    for _ in range(100):
+        bot.tick()
+    assert sum(clock.slept) > 900 * 3
+    assert game.count("go_back") == 0 and bot.stats.recoveries == 0
+
+
+def test_retrains_after_ten_not_ready_polls():
+    game = FakeGame([Screen.HOME], army_ready=False)
+    bot, _ = make_bot(game)
+    for _ in range(9):
+        bot.tick()
+    assert game.count("quick_train") == 1
+    bot.tick()  # 10th not-ready poll re-arms training
+    assert game.count("quick_train") == 2
+
+
+def test_restart_does_not_consume_stuck_timer():
+    game = FakeGame([Screen.UNKNOWN])
+    bot, clock = make_bot(game, settings=with_timing(stuck_timeout_s=60, max_restarts=3))
+    game.on_restart = lambda: clock.sleep(33)
+    while game.count("restart_game") < 1:
+        bot.tick()
+    t0 = clock.current  # restart returned (33 s elapsed inside it)
+    while game.count("restart_game") < 2:
+        bot.tick()
+    assert (clock.current - t0).total_seconds() >= 60
+
+
+def test_unknown_entry_takes_no_screenshot():
+    game = FakeGame([Screen.UNKNOWN])
+    bot, _ = make_bot(game)
+    bot.tick()
+    assert game.count("save_debug_screenshot") == 0
 
 
 def test_adb_errors_reconnect_then_fatal():

@@ -99,6 +99,7 @@ class FakeGame:
         self.fail_screen_times = 0
         self.failing = set()
         self.calls = []
+        self.on_restart = None
 
     def count(self, name):
         return sum(1 for c in self.calls if c == name)
@@ -121,10 +122,16 @@ class FakeGame:
         self.calls.append("save_debug_screenshot")
         return None
 
+    def restart_game(self):
+        self.calls.append("restart_game")
+        if self.on_restart:
+            self.on_restart()
+        return "restart_game" not in self.failing
+
     def __getattr__(self, name):
         if name in {"quick_train", "close_army", "open_attack_menu", "find_match", "next_base",
                     "deploy_army", "end_battle", "return_home", "dismiss_popup", "go_back",
-                    "restart_game", "reconnect"}:
+                    "reconnect"}:
             return lambda: (self.calls.append(name), name not in self.failing)[1]
         raise AttributeError(name)
 

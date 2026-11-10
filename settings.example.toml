@@ -14,7 +14,8 @@ max_next = 50            # after this many skips, attack the current base anyway
 [deploy]
 sides = 4                # how many diamond edges to deploy along (1-4)
 points_per_side = 5
-taps_per_point = 2
+taps_per_point = 2       # sides * points_per_side * taps_per_point should be >= troops per slot
+                         # (e.g. 4 * 8 * 4 = 128 for a full barch army); raise these for big armies
 troop_slots = [1]        # troop card slots to deploy (calibrate troop_slot_N for each)
 outward_px = 12          # push deploy points this far outside the map edge
 max_y = 600              # never tap below this y (troop bar)
@@ -26,6 +27,7 @@ battle_timeout_s = 180
 stuck_timeout_s = 60
 army_poll_s = [60, 120]
 max_restarts = 3
+progress_timeout_s = 900  # no forward progress (screen transition / rest) for this long -> recover
 
 [session]
 play_minutes = [40, 70]

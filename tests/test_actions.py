@@ -140,3 +140,11 @@ def test_save_debug_screenshot(tmp_path):
     game.capture()
     path = game.save_debug_screenshot("stuck")
     assert path is not None and path.exists() and path.name.endswith("_stuck.png")
+
+
+def test_save_debug_screenshot_write_failure_returns_none(tmp_path, monkeypatch):
+    import cv2
+    game, _ = make_game(debug_dir=tmp_path)
+    game.capture()
+    monkeypatch.setattr(cv2, "imwrite", lambda *a, **k: False)
+    assert game.save_debug_screenshot("x") is None

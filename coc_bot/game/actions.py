@@ -84,7 +84,7 @@ class Game:
     def army_ready(self) -> bool:
         if not self.tap_template(N.BTN_ARMY) or not self.wait_for(N.ARMY_CLOSE):
             return False
-        ready = self.templates.find(self.last_image, N.ARMY_FULL) is not None
+        ready = self.wait_for(N.ARMY_FULL, timeout_s=1.5)
         self.tap_template(N.ARMY_CLOSE, fresh=False)
         return ready
 
@@ -185,6 +185,8 @@ class Game:
             return None
         self.debug_dir.mkdir(parents=True, exist_ok=True)
         path = self.debug_dir / f"{datetime.now():%Y%m%d_%H%M%S_%f}_{tag}.png"
-        cv2.imwrite(str(path), self.last_image)
+        if not cv2.imwrite(str(path), self.last_image):
+            log.warning("Could not write screenshot %s", path)
+            return None
         log.info("Saved screenshot %s", path)
         return path

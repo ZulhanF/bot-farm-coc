@@ -20,6 +20,16 @@ MAX_SAME_ACTION_TICKS = 5
 MAX_FAILED_ACTIONS = 5
 MAX_ADB_RECONNECTS = 3
 BATTLE_OVERRUN_S = 120
+RETRAIN_AFTER_POLLS = 10
+FORWARD_TRANSITIONS = frozenset({
+    (Screen.HOME, Screen.ATTACK_MENU),
+    (Screen.ATTACK_MENU, Screen.SEARCHING),
+    (Screen.ATTACK_MENU, Screen.BASE_PREVIEW),
+    (Screen.SEARCHING, Screen.BASE_PREVIEW),
+    (Screen.BASE_PREVIEW, Screen.BATTLE),
+    (Screen.BATTLE, Screen.RESULT),
+    (Screen.RESULT, Screen.HOME),
+})
 
 
 class FatalError(RuntimeError):
@@ -61,6 +71,8 @@ class Bot:
         self._recover_level = 0
         self._consecutive_restarts = 0
         self._failed_actions = 0
+        self._army_polls = 0
+        self._last_progress: datetime | None = None
         self._handlers = {
             Screen.HOME: self._on_home,
             Screen.ATTACK_MENU: self._on_attack_menu,
@@ -78,6 +90,7 @@ class Bot:
 
     def run(self, max_ticks: int | None = None) -> None:
         self.policy.start_play(self.clock())
+        self._last_progress = self.clock()
         adb_failures = 0
         ticks = 0
         try:
@@ -108,6 +121,14 @@ class Bot:
         screen = self.game.screen()
         if self._check_stuck(screen, now):
             return
+        if self._last_progress is None:
+            self._last_progress = now
+        if (now - self._last_progress).total_seconds() > self.settings.timing.progress_timeout_s:
+            log.warning("No forward progress for %ds on %s",
+                        self.settings.timing.progress_timeout_s, screen.name)
+            self._recover(screen)
+            self._last_progress = now
+            return
         self._handlers[screen](now)
         if self._failed_actions >= MAX_FAILED_ACTIONS:
             log.warning("%d game actions in a row did nothing on %s",
@@ -123,20 +144,21 @@ class Bot:
             self._failed_actions += 1
         return bool(ok)
 
-    def _mark_progress(self) -> None:
+    def _mark_progress(self, now: datetime | None = None) -> None:
         """The bot got somewhere, so recovery starts from Back again."""
         self._recover_level = 0
         self._consecutive_restarts = 0
+        self._last_progress = now if now is not None else self.clock()
 
     # --- stuck detection / recovery --------------------------------------
     def _check_stuck(self, screen: Screen, now: datetime) -> bool:
         if screen != self._last_screen:
             log.debug("Screen: %s", screen.name)
+            if (self._last_screen, screen) in FORWARD_TRANSITIONS:
+                self._mark_progress(now)
             self._last_screen = screen
             self._same_ticks = 1
             self._wait_since = now if screen in WAIT_SCREENS else None
-            if screen is Screen.UNKNOWN:
-                self.game.save_debug_screenshot("unknown")
         else:
             self._same_ticks += 1
         stuck = (
@@ -168,6 +190,7 @@ class Bot:
             log.warning("Stuck on %s, pressing Back", screen.name)
             self._recover_level = 1
             self.game.go_back()
+            self._after_recovery()
             return
         if self._consecutive_restarts >= self.settings.timing.max_restarts:
             raise FatalError(f"Still stuck on {screen.name} after {self._consecutive_restarts} restarts")
@@ -176,6 +199,13 @@ class Bot:
         log.warning("Stuck on %s, restarting game (%d/%d)", screen.name,
                     self._consecutive_restarts, self.settings.timing.max_restarts)
         self.game.restart_game()
+        self._after_recovery()
+
+    def _after_recovery(self) -> None:
+        """Back/restart can take a long time; the next tick starts a fresh stuck timer."""
+        self._last_screen = None
+        self._same_ticks = 0
+        self._wait_since = None
 
     # --- screen handlers --------------------------------------------------
     def _on_home(self, now: datetime) -> None:
@@ -189,15 +219,21 @@ class Bot:
             self._mark_progress()
             return
         if self.game.army_ready():
+            self._army_polls = 0
             log.info("Army ready, opening attack menu")
             if self._act(self.game.open_attack_menu()):
-                self._mark_progress()
+                self.sleep(self.rng.uniform(1.0, 2.0))
             return
+        self._army_polls += 1
+        if self._army_polls >= RETRAIN_AFTER_POLLS:
+            self._trained = False
+            self._army_polls = 0
         if not self._trained:
             log.info("Army not ready, quick training")
             if self._act(self.game.quick_train()):
                 self._trained = True
         self.sleep(self.rng.uniform(*self.settings.timing.army_poll_s))
+        self._last_progress = self.clock()  # waiting for the army is legitimate
 
     def _on_attack_menu(self, now: datetime) -> None:
         self._next_count = 0
@@ -222,7 +258,6 @@ class Bot:
             log.info("Attacking (%s) %s after %d skips",
                      "loot ok" if worth else "max_next reached", loot, self._next_count)
             self.game.deploy_army()
-            self._mark_progress()
             self.stats.attacks += 1
             self._trained = False
             self._battle_started = now
@@ -244,8 +279,7 @@ class Bot:
     def _on_result(self, now: datetime) -> None:
         self._battle_started = None
         log.info("Battle finished. %s", self.stats)
-        if self._act(self.game.return_home()):
-            self._mark_progress()
+        self._act(self.game.return_home())
         self.sleep(self.rng.uniform(2.0, 4.0))
 
     def _on_popup(self, now: datetime) -> None:
