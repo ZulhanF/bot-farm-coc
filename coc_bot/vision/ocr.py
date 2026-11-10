@@ -1,6 +1,7 @@
 """Read loot numbers from fixed screen regions."""
 from __future__ import annotations
 
+import logging
 from typing import Callable
 
 import cv2
@@ -8,6 +9,7 @@ import numpy as np
 
 from coc_bot.config import Box
 
+log = logging.getLogger(__name__)
 OcrEngine = Callable[[np.ndarray], list[tuple[str, float]]]
 
 _CONFUSIONS = str.maketrans({"O": "0", "o": "0", "I": "1", "l": "1"})
@@ -48,9 +50,16 @@ def rapidocr_engine() -> OcrEngine:
     engine = RapidOCR()
 
     def run(image: np.ndarray) -> list[tuple[str, float]]:
-        result, _ = engine(image)
+        # Every ROI holds exactly one line of digits, so skip text detection: the detector
+        # splits "1 354 460" into overlapping boxes ("1354", "46", "60") and drops leading
+        # digits, and it is also the memory-hungry step ("bad allocation" under pressure).
+        try:
+            result, _ = engine(image, use_det=False, use_cls=False, use_rec=True)
+        except Exception as exc:  # onnxruntime errors must not kill a multi-hour run
+            log.warning("OCR failed: %s", str(exc).splitlines()[-1] if str(exc) else exc)
+            return []
         if not result:
             return []
-        return [(str(item[1]), float(item[2])) for item in result]
+        return [(str(item[0]), float(item[1])) for item in result]
 
     return run
