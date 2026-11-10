@@ -213,30 +213,44 @@ class Game:
                     self.tap(card_pt)
                     self.sleep(0.2)
 
-    def spell_targets(self) -> list[Point]:
-        """One point per deploy wing, `depth` of the way from the wing's middle towards map_center."""
+    def spell_rows(self) -> list[list[Point]]:
+        """Spell drop points: one row per deploy wing, like the troop rows but shifted forward.
+
+        Each wing's row is moved `depth` of the way from its middle towards map_center (0 = on the
+        deploy line, 1 = at the centre). `casts` spells per slot are split evenly over the wings and
+        spread along each shifted row.
+        """
+        cfg = self.settings.spells
         center = self.settings.calibration.points.get(N.MAP_CENTER)
-        if center is None:
+        wings = [w for w in self.wings if w]
+        if center is None or not wings or cfg.casts <= 0:
             return []
-        depth = self.settings.spells.depth
         height, width = self.last_image.shape[:2] if self.last_image is not None else (720, 1280)
         max_y = min(height - 1, self.settings.deploy.max_y)
-        out: list[Point] = []
-        for wing in self.wings:
-            if not wing:
+        per_wing, extra = divmod(cfg.casts, len(wings))
+        rows: list[list[Point]] = []
+        for i, wing in enumerate(wings):
+            count = per_wing + (1 if i < extra else 0)
+            if count == 0:
                 continue
             mx = sum(p[0] for p in wing) / len(wing)
             my = sum(p[1] for p in wing) / len(wing)
-            x = mx + (center[0] - mx) * depth
-            y = my + (center[1] - my) * depth
-            out.append((min(max(int(round(x)), 0), width - 1), min(max(int(round(y)), 0), max_y)))
-        return out
+            dx, dy = (center[0] - mx) * cfg.depth, (center[1] - my) * cfg.depth
+            (ax, ay), (bx, by) = wing[0], wing[-1]
+            row = []
+            for k in range(count):
+                t = (k + 0.5) / count  # middle of each equal segment of the row
+                x = ax + (bx - ax) * t + dx
+                y = ay + (by - ay) * t + dy
+                row.append((min(max(int(round(x)), 0), width - 1), min(max(int(round(y)), 0), max_y)))
+            rows.append(row)
+        return rows
 
     def cast_spells(self) -> bool:
-        """Drop each spell slot `casts` times in front of the deployed troops, alternating wings."""
+        """Drop each spell slot along rows in front of the deployed troops."""
         cfg = self.settings.spells
         points = self.settings.calibration.points
-        targets = self.spell_targets()
+        targets = [pt for row in self.spell_rows() for pt in row]
         if not cfg.slots or not targets:
             return False
         cast = False
@@ -245,8 +259,8 @@ class Game:
             if card is None:
                 continue
             self.tap(card)
-            for i in range(cfg.casts):
-                self.tap(targets[i % len(targets)])
+            for target in targets:
+                self.tap(target)
             cast = True
         return cast
 

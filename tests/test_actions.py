@@ -162,29 +162,51 @@ def spell_game(depth=0.5, casts=2, center=(640, 360)):
     return make_game(settings=s)
 
 
-def test_spell_targets_sit_between_each_wing_and_center():
-    game, _ = spell_game(depth=0.5)
+def test_spell_rows_are_troop_rows_shifted_forward():
+    game, _ = spell_game(depth=0.5, casts=8)       # 4 wings -> 2 spells per row
     game.capture()
     game.deploy_army()
-    targets = game.spell_targets()
-    assert len(targets) == len(game.wings) == 4
-    for wing, (x, y) in zip(game.wings, targets):
+    rows = game.spell_rows()
+    assert [len(r) for r in rows] == [2, 2, 2, 2]
+    for wing, row in zip(game.wings, rows):
         mx = sum(p[0] for p in wing) / len(wing)
         my = sum(p[1] for p in wing) / len(wing)
-        assert abs(x - (mx + 640) / 2) <= 1 and abs(y - min((my + 360) / 2, 600)) <= 1
+        shift = ((640 - mx) * 0.5, (360 - my) * 0.5)
+        (ax, ay), (bx, by) = wing[0], wing[-1]
+        for k, (x, y) in enumerate(row):
+            t = (k + 0.5) / 2
+            ex, ey = ax + (bx - ax) * t + shift[0], ay + (by - ay) * t + shift[1]
+            assert abs(x - ex) <= 1 and abs(y - min(ey, 600)) <= 1
 
 
-def test_cast_spells_taps_card_then_alternates_wings():
-    game, adb = spell_game(casts=3)
+def test_spell_rows_split_casts_over_wings():
+    game, _ = spell_game(casts=6)                  # 4 wings -> 2, 2, 1, 1
+    game.capture()
+    game.deploy_army()
+    assert [len(r) for r in game.spell_rows()] == [2, 2, 1, 1]
+
+
+def test_depth_zero_keeps_spells_on_the_deploy_line():
+    game, _ = spell_game(depth=0.0, casts=4)
+    game.capture()
+    game.deploy_army()
+    for wing, row in zip(game.wings, game.spell_rows()):
+        (ax, ay), (bx, by) = wing[0], wing[-1]
+        x, y = row[0]
+        assert abs(x - (ax + (bx - ax) * 0.5)) <= 1 and abs(y - (ay + (by - ay) * 0.5)) <= 1
+
+
+def test_cast_spells_taps_card_then_each_row():
+    game, adb = spell_game(casts=4)
     game.capture()
     game.deploy_army()
     before = len(adb.taps())
-    targets = game.spell_targets()
+    targets = [pt for row in game.spell_rows() for pt in row]
     assert game.cast_spells()
     taps = adb.taps()[before:]
-    assert len(taps) == 4
+    assert len(taps) == 1 + len(targets) == 5
     assert near(taps[0], (700, 680))
-    for tap, target in zip(taps[1:], (targets[0], targets[1], targets[2])):
+    for tap, target in zip(taps[1:], targets):
         assert near(tap, target)
 
 

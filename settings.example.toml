@@ -23,12 +23,12 @@ outward_px = 20          # push deploy points this far outside the map edge
 max_y = 600              # never tap below this y (troop bar)
 
 [spells]
-# Spells (e.g. Rage) dropped in front of the deployed troops, once per battle.
+# Spells (e.g. Rage) dropped in rows like the troops, shifted forward, once per battle.
 # Calibrate point map_center (middle of the enemy base) and troop_slot_N for each spell card.
 slots = []               # spell card slots, e.g. [6] for Rage in slot 6; empty = no spells
-casts = 2                # casts per slot, alternating left / right wing
+casts = 2                # spells per slot, split over the left / right rows (4 = 2 per row)
 delay_s = 5.0            # seconds after the troops are deployed
-depth = 0.35             # 0 = on the deploy line, 1 = at map_center
+depth = 0.35             # how far the rows move forward: 0 = on the troop line, 1 = at map_center
 
 [timing]
 tap_delay_ms = [120, 350]

@@ -46,8 +46,8 @@
   your thresholds, with a cap on how many times it presses *Next*.
 - **Configurable deployment** — troops along calibrated "clock" lines or the map diamond (`v_top`,
   `v_bottom`, `all`), plus siege machine and heroes with automatic ability activation.
-- **Spells** — drops spells such as Rage in front of each deploy wing a few seconds after the troops
-  land, to push them past 50 % faster.
+- **Spells** — drops spells such as Rage in rows like the troops, shifted forward in front of them,
+  a few seconds after they land, to push them past 50 % faster.
 - **Storage-full check** — reads your own Gold / Elixir before each attack and stops (or waits) when your
   storages are full, so no loot goes to waste.
 - **Self-recovery** — detects popups, stuck screens and lost connections; escalates from *Back* to a full
@@ -155,7 +155,7 @@ Calibration data is written to `calibration.toml` by the `calibrate` command.
 |---|---|
 | `[loot]` | `min_gold`, `min_elixir`, `min_de`, `max_next` — `0` / `0` / `0` / `0` attacks the first base found |
 | `[deploy]` | `pattern`, `points_per_side`, `taps_per_point`, `troop_slots`, `siege_slot`, `hero_slots` |
-| `[spells]` | `slots`, `casts`, `delay_s`, `depth` — `depth = 0` on the deploy line, `1` at `map_center` |
+| `[spells]` | `slots`, `casts` (split over the troop rows), `delay_s`, `depth` — `0` on the troop line, `1` at `map_center` |
 | `[timing]` | `battle_timeout_s`, `damage_stagnant_s`, `tap_delay_ms`, `tap_jitter_px`, `progress_timeout_s` |
 | `[storage]` | `gold_cap`, `elixir_cap`, `de_cap`, `full_ratio`, `on_full` (`"stop"` / `"wait"`) |
 | `[session]` | `enabled`, `play_minutes`, `break_minutes`, `active_hours`, `max_hours_per_day` |
@@ -170,7 +170,7 @@ max_next = 0             # attack the first base: chase the win bonus, not big l
 
 [spells]
 slots = [6]              # Rage card in slot 6
-casts = 2                # one Rage per wing
+casts = 4                # two Rages along each row
 delay_s = 5.0
 depth = 0.35             # just in front of the dragons
 
