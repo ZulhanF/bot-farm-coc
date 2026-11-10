@@ -47,9 +47,18 @@ class TimingConfig:
     battle_timeout_s: int = 180
     stuck_timeout_s: int = 60
     damage_stagnant_s: float = 5.0
-    army_poll_s: tuple[int, int] = (60, 120)
     max_restarts: int = 3
     progress_timeout_s: int = 900   # no forward progress for this long -> recover
+
+
+@dataclass(frozen=True)
+class StorageConfig:
+    gold_cap: int = 0        # your storage capacity; 0 = don't check this resource
+    elixir_cap: int = 0
+    de_cap: int = 0
+    full_ratio: float = 0.95  # "full" = amount >= cap * full_ratio
+    on_full: str = "stop"     # "stop" = end the run, "wait" = sleep wait_minutes then check again
+    wait_minutes: int = 30
 
 
 @dataclass(frozen=True)
@@ -88,6 +97,7 @@ class Settings:
     deploy: DeployConfig = field(default_factory=DeployConfig)
     timing: TimingConfig = field(default_factory=TimingConfig)
     session: SessionConfig = field(default_factory=SessionConfig)
+    storage: StorageConfig = field(default_factory=StorageConfig)
     vision: VisionConfig = field(default_factory=VisionConfig)
     calibration: Calibration = field(default_factory=Calibration)
 
@@ -98,6 +108,7 @@ _SECTIONS: dict[str, type] = {
     "deploy": DeployConfig,
     "timing": TimingConfig,
     "session": SessionConfig,
+    "storage": StorageConfig,
     "vision": VisionConfig,
 }
 

@@ -12,6 +12,7 @@ import cv2
 import numpy as np
 
 from coc_bot import names as N
+from coc_bot.bot.records import CsvRecorder
 from coc_bot.bot.session import SessionPolicy
 from coc_bot.bot.state_machine import Bot, FatalError
 from coc_bot.config import Box, Settings, load_calibration, load_settings, save_calibration
@@ -135,7 +136,7 @@ def cmd_test_vision(args: argparse.Namespace, settings: Settings) -> int:
     if rois:
         reader = OcrReader(rapidocr_engine())
         for name, roi in rois.items():
-            limit = N.MAX_DE if name == N.ROI_DE else N.MAX_GOLD
+            limit = N.ROI_LIMITS.get(name, N.MAX_GOLD)
             print(f"  OCR {name:<8} = {reader.read_number(image, roi, limit)}")
     return 0
 
@@ -158,7 +159,7 @@ def cmd_run(args: argparse.Namespace, settings: Settings) -> int:
         rng = random.Random()
         game = Game(adb, templates, OcrReader(rapidocr_engine()), settings, rng)
         bot = Bot(game, SessionPolicy(settings.session, rng), settings, rng,
-                  clock=datetime.now, sleep=time.sleep)
+                  clock=datetime.now, sleep=time.sleep, recorder=CsvRecorder(Path("logs")))
         bot.run()
     except KeyboardInterrupt:
         log.info("Stopped by user (Ctrl+C).%s", f" {bot.stats}" if bot else "")

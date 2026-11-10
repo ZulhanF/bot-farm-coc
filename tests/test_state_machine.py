@@ -6,7 +6,7 @@ import pytest
 from coc_bot.bot.state_machine import Bot, FatalError
 from coc_bot.game.loot import Loot
 from coc_bot.vision.screens import Screen
-from tests.fakes import FakeClock, FakeGame, FakePolicy, make_settings
+from tests.fakes import FakeClock, FakeGame, FakePolicy, make_settings  # noqa: F401
 
 RICH = Loot(1_000_000, 1_000_000, 0)
 POOR = Loot(1_000, 1_000, 0)
@@ -151,7 +151,7 @@ def test_progress_screen_resets_escalation():
 
 
 def test_home_without_forward_progress_trips_watchdog():
-    game = FakeGame([Screen.HOME])  # army ready, open_attack_menu "succeeds", screen never moves
+    game = FakeGame([Screen.HOME])  # open_attack_menu "succeeds", screen never moves
     bot, clock = make_bot(game, settings=with_timing(progress_timeout_s=900))
     for _ in range(300):
         bot.tick()
@@ -247,3 +247,76 @@ def test_run_ends_play_on_fatal():
     with pytest.raises(FatalError):
         bot.run(max_ticks=1000)
     assert policy.events[-1] == "end"
+
+
+
+def with_storage(**kw):
+    s = make_settings()
+    return replace(s, storage=replace(s.storage, **kw))
+
+
+def test_storage_not_read_when_no_caps():
+    game = FakeGame([Screen.HOME])
+    make_bot(game)[0].tick()
+    assert game.count("read_storage") == 0
+    assert game.count("open_attack_menu") == 1
+
+
+def test_full_storage_stops_bot():
+    game = FakeGame([Screen.HOME])
+    game.storage = Loot(1000, 1000, 0)
+    bot, _ = make_bot(game, settings=with_storage(gold_cap=1000, elixir_cap=1000))
+    bot.run(max_ticks=5)
+    assert game.count("read_storage") == 1
+    assert game.count("open_attack_menu") == 0
+
+
+def test_full_storage_wait_mode_sleeps_then_rechecks():
+    game = FakeGame([Screen.HOME])
+    game.storage = Loot(1000, 1000, 0)
+    bot, clock = make_bot(game, settings=with_storage(gold_cap=1000, elixir_cap=1000,
+                                                      on_full="wait", wait_minutes=30))
+    bot.tick()
+    assert clock.slept == [1800]
+    game.storage = Loot(10, 10, 0)
+    bot.tick()
+    assert game.count("open_attack_menu") == 1
+
+
+def test_not_full_storage_attacks():
+    game = FakeGame([Screen.HOME])
+    game.storage = Loot(500, 1000, 0)
+    bot, _ = make_bot(game, settings=with_storage(gold_cap=1000, elixir_cap=1000))
+    bot.tick()
+    assert game.count("open_attack_menu") == 1
+
+
+def test_attack_recorded_once_with_loot_and_cycle():
+    rows = []
+    game = FakeGame([Screen.BASE_PREVIEW, Screen.RESULT, Screen.RESULT,
+                     Screen.BASE_PREVIEW, Screen.RESULT])
+    game.loot = RICH
+    game.result_loot = Loot(400_000, 300_000, 2_000)
+    clock = FakeClock()
+    bot = Bot(game, FakePolicy(), make_settings(), random.Random(0),
+              clock=clock.now, sleep=clock.sleep, recorder=rows.append)
+    for _ in range(5):
+        bot.tick()
+    assert len(rows) == 2
+    assert rows[0]["cycle_s"] is None
+    assert rows[1]["cycle_s"] > 0
+    assert rows[0]["gained_gold"] == 400_000 and rows[0]["preview_gold"] == RICH.gold
+    assert bot.stats.gold == 800_000 and bot.stats.de == 4_000
+
+
+def test_unreadable_result_loot_still_recorded():
+    rows = []
+    game = FakeGame([Screen.BASE_PREVIEW, Screen.RESULT])
+    game.loot = RICH
+    clock = FakeClock()
+    bot = Bot(game, FakePolicy(), make_settings(), random.Random(0),
+              clock=clock.now, sleep=clock.sleep, recorder=rows.append)
+    bot.tick()
+    bot.tick()
+    assert rows[0]["gained_gold"] is None
+    assert bot.stats.gold == 0

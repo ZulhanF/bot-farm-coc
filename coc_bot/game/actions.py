@@ -80,25 +80,7 @@ class Game:
             self.sleep(interval_s)
             waited += interval_s
 
-    # --- army -------------------------------------------------------------
-    def army_ready(self) -> bool:
-        if not self.tap_template(N.BTN_ARMY) or not self.wait_for(N.ARMY_CLOSE):
-            return False
-        ready = self.wait_for(N.ARMY_FULL, timeout_s=1.5)
-        self.tap_template(N.ARMY_CLOSE, fresh=False)
-        return ready
-
-    def quick_train(self) -> bool:
-        if not self.tap_template(N.BTN_ARMY) or not self.wait_for(N.ARMY_CLOSE):
-            return False
-        ok = (
-            self.tap_template(N.TAB_QUICK_TRAIN)
-            and self.wait_for(N.BTN_TRAIN_SAVED)
-            and self.tap_template(N.BTN_TRAIN_SAVED, fresh=False)
-        )
-        self.tap_template(N.ARMY_CLOSE)
-        return bool(ok)
-
+    # --- army window (only closed if it opens by accident) ----------------
     def close_army(self) -> bool:
         if self.tap_template(N.ARMY_CLOSE, fresh=False):
             return True
@@ -147,6 +129,33 @@ class Game:
                 return None
             de = 0
         return Loot(gold, elixir, de)
+
+    def _read_resources(self, names: tuple[str, str, str]) -> Loot | None:
+        """OCR three counters from the current frame; uncalibrated ones read as 0."""
+        rois = self.settings.calibration.rois
+        if not any(name in rois for name in names):
+            return None
+        image = self._image(fresh=False)
+        values = []
+        for name in names:
+            if name not in rois:
+                values.append(0)
+                continue
+            value = self.ocr.read_number(image, rois[name], N.ROI_LIMITS[name])
+            if value is None:
+                log.warning("Could not read %s", name)
+                return None
+            values.append(value)
+        return Loot(*values)
+
+    def read_storage(self) -> Loot | None:
+        """Own gold/elixir/DE on the home village."""
+        return self._read_resources(N.HOME_ROIS)
+
+    def read_result_loot(self) -> Loot | None:
+        """Loot gained, read from the battle result screen."""
+        self.capture()
+        return self._read_resources(N.RESULT_ROIS)
 
     def deploy_army(self) -> None:
         d = self.settings.deploy

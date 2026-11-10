@@ -42,5 +42,15 @@ def test_complete():
 
 def test_valid_names():
     assert "popup_reload" in N.valid_names("template", (1,))
-    assert N.valid_names("roi", (1,)) == ("gold", "elixir", "de")
+    assert N.valid_names("roi", (1,))[:3] == ("gold", "elixir", "de")
+    assert {"home_gold", "result_gold"} <= set(N.valid_names("roi", (1,)))
     assert N.valid_names("point", (1, 2))[-2:] == ("troop_slot_1", "troop_slot_2")
+
+
+def test_home_roi_required_only_for_capped_resources():
+    from dataclasses import replace
+    settings = Settings(calibration=full_calibration())
+    settings = replace(settings, storage=replace(settings.storage, gold_cap=1000))
+    missing = N.missing_calibration(settings, set(N.REQUIRED_TEMPLATES))
+    assert "roi:home_gold" in missing
+    assert "roi:home_elixir" not in missing

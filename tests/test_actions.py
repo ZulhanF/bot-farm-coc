@@ -40,30 +40,6 @@ def test_tap_template_missing():
     assert adb.taps() == []
 
 
-def test_army_ready_true_and_closes():
-    pos = {"btn_army": (100, 600), "army_close": (1200, 50)}
-    game, adb = make_game({"btn_army", "army_close", "army_full"}, pos)
-    assert game.army_ready()
-    taps = adb.taps()
-    assert near(taps[0], (105, 605)) and near(taps[-1], (1205, 55))
-
-
-def test_army_ready_false_when_not_full():
-    game, _ = make_game({"btn_army", "army_close"})
-    assert not game.army_ready()
-
-
-def test_quick_train_sequence():
-    pos = {"btn_army": (100, 600), "tab_quick_train": (400, 100),
-           "btn_train_saved": (900, 300), "army_close": (1200, 50)}
-    game, adb = make_game(set(pos), pos)
-    assert game.quick_train()
-    taps = adb.taps()
-    assert len(taps) == 4
-    for tap, (x, y) in zip(taps, pos.values()):
-        assert near(tap, (x + 5, y + 5))
-
-
 def test_read_loot():
     game, _ = make_game(ocr={GOLD: 400_000, ELIXIR: 350_000, DE: 2_000})
     game.capture()
@@ -148,3 +124,36 @@ def test_save_debug_screenshot_write_failure_returns_none(tmp_path, monkeypatch)
     game.capture()
     monkeypatch.setattr(cv2, "imwrite", lambda *a, **k: False)
     assert game.save_debug_screenshot("x") is None
+
+
+def with_rois(**rois):
+    s = make_settings()
+    return replace(s, calibration=replace(s.calibration, rois={**s.calibration.rois, **rois}))
+
+
+def test_read_storage_uncalibrated_returns_none():
+    game, _ = make_game()
+    assert game.read_storage() is None
+
+
+def test_read_storage_reads_home_counters():
+    HG, HE = (900, 20, 150, 25), (900, 60, 150, 25)
+    game, _ = make_game(ocr={HG: 5_000_000, HE: 4_000_000},
+                        settings=with_rois(home_gold=HG, home_elixir=HE))
+    game.capture()
+    assert game.read_storage() == Loot(5_000_000, 4_000_000, 0)
+
+
+def test_read_storage_unreadable_counter_returns_none():
+    HG, HE = (900, 20, 150, 25), (900, 60, 150, 25)
+    game, _ = make_game(ocr={HG: 5_000_000}, settings=with_rois(home_gold=HG, home_elixir=HE))
+    game.capture()
+    assert game.read_storage() is None
+
+
+def test_read_result_loot_takes_fresh_frame():
+    RG, RE, RD = (500, 300, 150, 30), (500, 340, 150, 30), (500, 380, 150, 30)
+    game, adb = make_game(ocr={RG: 600_000, RE: 550_000, RD: 3_000},
+                          settings=with_rois(result_gold=RG, result_elixir=RE, result_de=RD))
+    assert game.read_result_loot() == Loot(600_000, 550_000, 3_000)
+    assert adb.calls[0] == ("screencap",)

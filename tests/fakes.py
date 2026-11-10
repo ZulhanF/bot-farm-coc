@@ -92,10 +92,9 @@ class FakeClock:
 
 
 class FakeGame:
-    def __init__(self, screens, loot=None, army_ready=True):
+    def __init__(self, screens, loot=None):
         self.screens = list(screens)
         self.loot = loot
-        self._army_ready = army_ready
         self.fail_screen_times = 0
         self.failing = set()
         self.calls = []
@@ -110,13 +109,17 @@ class FakeGame:
             raise AdbError("boom")
         return self.screens.pop(0) if len(self.screens) > 1 else self.screens[0]
 
-    def army_ready(self):
-        self.calls.append("army_ready")
-        return self._army_ready
-
     def read_loot(self):
         self.calls.append("read_loot")
         return self.loot
+
+    def read_storage(self):
+        self.calls.append("read_storage")
+        return getattr(self, "storage", None)
+
+    def read_result_loot(self):
+        self.calls.append("read_result_loot")
+        return getattr(self, "result_loot", None)
 
     def read_damage_percent(self):
         return getattr(self, "damage_percent", None)
@@ -132,7 +135,7 @@ class FakeGame:
         return "restart_game" not in self.failing
 
     def __getattr__(self, name):
-        if name in {"quick_train", "close_army", "open_attack_menu", "find_match", "next_base",
+        if name in {"close_army", "open_attack_menu", "find_match", "next_base",
                     "deploy_army", "end_battle", "return_home", "dismiss_popup", "go_back",
                     "reconnect"}:
             return lambda: (self.calls.append(name), name not in self.failing)[1]

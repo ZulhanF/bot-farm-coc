@@ -28,7 +28,6 @@ tap_jitter_px = 4
 battle_timeout_s = 60
 damage_stagnant_s = 5.0  # surrender if damage percentage does not increase for this many seconds
 stuck_timeout_s = 60
-army_poll_s = [60, 120]
 max_restarts = 3
 progress_timeout_s = 900  # no forward progress (screen transition / rest) for this long -> recover
 
@@ -38,6 +37,16 @@ play_minutes = [40, 70]
 break_minutes = [10, 25]
 active_hours = ["08:00", "23:00"]
 max_hours_per_day = 10.0
+
+[storage]
+# Storage-full check on the home village. Set your storage capacity (as shown in-game)
+# and calibrate roi home_gold / home_elixir / home_de. 0 = don't check that resource.
+gold_cap = 0
+elixir_cap = 0
+de_cap = 0
+full_ratio = 0.95        # full when amount >= cap * full_ratio (all checked resources)
+on_full = "stop"         # "stop" = end the run, "wait" = sleep wait_minutes, then check again
+wait_minutes = 30
 
 [vision]
 threshold = 0.85

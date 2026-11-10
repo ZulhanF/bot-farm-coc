@@ -11,11 +11,7 @@ BTN_SURRENDER = "btn_surrender"      # "Menyerah" button during active battle
 BTN_NEXT = "btn_next"                # Next button while previewing an enemy base
 BTN_END_BATTLE = "btn_end_battle"    # End Battle / Surrender button
 BTN_RETURN_HOME = "btn_return_home"  # Return Home on the battle result screen
-BTN_ARMY = "btn_army"                # Army / train button on the home village
 ARMY_CLOSE = "army_close"            # X that closes the army window
-ARMY_FULL = "army_full"              # indicator that the army is complete
-TAB_QUICK_TRAIN = "tab_quick_train"  # Quick Train tab in the army window
-BTN_TRAIN_SAVED = "btn_train_saved"  # Train button of saved army #1
 SEARCHING = "searching"              # clouds while searching for opponent
 
 # Popups, in priority order
@@ -29,19 +25,36 @@ REQUIRED_TEMPLATES = (
     HOME_ATTACK, BTN_FIND_MATCH, BTN_ATTACK, BTN_NEXT, BTN_END_BATTLE, BTN_RETURN_HOME, POPUP_OKAY,
 )
 OPTIONAL_TEMPLATES = (
-    SEARCHING, POPUP_RELOAD, POPUP_TRY_AGAIN, POPUP_CLOSE, BTN_SURRENDER,
-    BTN_ARMY, ARMY_CLOSE, ARMY_FULL, TAB_QUICK_TRAIN, BTN_TRAIN_SAVED,
+    SEARCHING, POPUP_RELOAD, POPUP_TRY_AGAIN, POPUP_CLOSE, BTN_SURRENDER, ARMY_CLOSE,
 )
 
 # Loot ROIs on the enemy base preview
 ROI_GOLD = "gold"
 ROI_ELIXIR = "elixir"
 ROI_DE = "de"
+# Own resource counters on the home village (top right) -> storage-full check
+ROI_HOME_GOLD = "home_gold"
+ROI_HOME_ELIXIR = "home_elixir"
+ROI_HOME_DE = "home_de"
+HOME_ROIS = (ROI_HOME_GOLD, ROI_HOME_ELIXIR, ROI_HOME_DE)
+# Loot gained, on the battle result screen -> loot log
+ROI_RESULT_GOLD = "result_gold"
+ROI_RESULT_ELIXIR = "result_elixir"
+ROI_RESULT_DE = "result_de"
+RESULT_ROIS = (ROI_RESULT_GOLD, ROI_RESULT_ELIXIR, ROI_RESULT_DE)
+
 REQUIRED_ROIS = (ROI_GOLD, ROI_ELIXIR)
-OPTIONAL_ROIS = (ROI_DE,)
+OPTIONAL_ROIS = (ROI_DE,) + HOME_ROIS + RESULT_ROIS
 MAX_GOLD = 5_000_000
 MAX_ELIXIR = 5_000_000
 MAX_DE = 100_000
+MAX_STORAGE = 100_000_000
+MAX_STORAGE_DE = 1_000_000
+ROI_LIMITS = {
+    ROI_GOLD: MAX_GOLD, ROI_ELIXIR: MAX_ELIXIR, ROI_DE: MAX_DE,
+    ROI_HOME_GOLD: MAX_STORAGE, ROI_HOME_ELIXIR: MAX_STORAGE, ROI_HOME_DE: MAX_STORAGE_DE,
+    ROI_RESULT_GOLD: MAX_GOLD * 2, ROI_RESULT_ELIXIR: MAX_ELIXIR * 2, ROI_RESULT_DE: MAX_DE * 2,
+}
 
 # Points: map diamond corners (fully zoomed out) and troop card slots
 MAP_CORNERS = ("map_top", "map_right", "map_bottom", "map_left")
@@ -87,6 +100,10 @@ def missing_calibration(settings: Settings, template_names: set[str]) -> list[st
         required_rois = (ROI_DE,) if settings.loot.min_de > 0 else ()
     else:
         required_rois = REQUIRED_ROIS + ((ROI_DE,) if settings.loot.min_de > 0 else ())
+    storage = settings.storage
+    caps = ((ROI_HOME_GOLD, storage.gold_cap), (ROI_HOME_ELIXIR, storage.elixir_cap),
+            (ROI_HOME_DE, storage.de_cap))
+    required_rois = required_rois + tuple(name for name, cap in caps if cap > 0)
     missing += [f"roi:{n}" for n in required_rois if n not in cal.rois]
     missing += [
         f"point:{n}" for n in required_points(
