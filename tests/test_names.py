@@ -22,6 +22,13 @@ def test_missing_everything():
     assert "roi:de" not in missing  # optional
 
 
+def test_de_roi_required_when_min_de_positive():
+    from dataclasses import replace
+    settings = Settings(calibration=full_calibration())
+    settings = replace(settings, loot=replace(settings.loot, min_de=1000))
+    assert N.missing_calibration(settings, set(N.REQUIRED_TEMPLATES)) == ["roi:de"]
+
+
 def test_template_needs_both_png_and_box():
     settings = Settings(calibration=full_calibration())
     missing = N.missing_calibration(settings, set(N.REQUIRED_TEMPLATES) - {"btn_next"})

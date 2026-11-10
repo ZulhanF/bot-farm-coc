@@ -67,7 +67,8 @@ def missing_calibration(settings: Settings, template_names: set[str]) -> list[st
         f"template:{n}" for n in REQUIRED_TEMPLATES
         if n not in template_names or n not in cal.templates
     ]
-    missing += [f"roi:{n}" for n in REQUIRED_ROIS if n not in cal.rois]
+    required_rois = REQUIRED_ROIS + ((ROI_DE,) if settings.loot.min_de > 0 else ())
+    missing += [f"roi:{n}" for n in required_rois if n not in cal.rois]
     missing += [
         f"point:{n}" for n in required_points(settings.deploy.troop_slots) if n not in cal.points
     ]
