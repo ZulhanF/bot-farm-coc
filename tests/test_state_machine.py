@@ -165,5 +165,51 @@ def test_run_starts_play_and_stop_flag():
     bot, _ = make_bot(game, policy=policy)
     bot.stop()
     bot.run()
-    assert policy.events == ["start"]
+    assert policy.events == ["start", "end"]
     assert game.calls == []
+
+
+def test_failed_home_action_triggers_recovery():
+    game = FakeGame([Screen.HOME])
+    game.failing = {"open_attack_menu"}
+    bot, _ = make_bot(game)
+    for _ in range(5):
+        bot.tick()
+    assert game.count("go_back") == 1
+
+
+def test_failed_actions_escalate_to_restart():
+    game = FakeGame([Screen.HOME])
+    game.failing = {"open_attack_menu"}
+    bot, _ = make_bot(game)
+    for _ in range(10):
+        bot.tick()
+    assert game.count("go_back") == 1
+    assert game.count("restart_game") == 1
+
+
+def test_failed_quick_train_retried():
+    game = FakeGame([Screen.HOME], army_ready=False)
+    game.failing = {"quick_train"}
+    bot, _ = make_bot(game)
+    bot.tick()
+    bot.tick()
+    assert game.count("quick_train") == 2
+
+
+def test_battle_overrun_recovers():
+    game = FakeGame([Screen.BATTLE])
+    bot, _ = make_bot(game, settings=with_timing(battle_timeout_s=9))
+    bot.run(max_ticks=60)
+    assert game.count("end_battle") >= 1
+    assert game.count("go_back") >= 1
+
+
+def test_run_ends_play_on_fatal():
+    game = FakeGame([Screen.UNKNOWN])
+    policy = FakePolicy()
+    bot, _ = make_bot(game, policy=policy,
+                      settings=with_timing(stuck_timeout_s=60, max_restarts=3))
+    with pytest.raises(FatalError):
+        bot.run(max_ticks=1000)
+    assert policy.events[-1] == "end"

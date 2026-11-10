@@ -97,6 +97,7 @@ class FakeGame:
         self.loot = loot
         self._army_ready = army_ready
         self.fail_screen_times = 0
+        self.failing = set()
         self.calls = []
 
     def count(self, name):
@@ -124,7 +125,7 @@ class FakeGame:
         if name in {"quick_train", "close_army", "open_attack_menu", "find_match", "next_base",
                     "deploy_army", "end_battle", "return_home", "dismiss_popup", "go_back",
                     "restart_game", "reconnect"}:
-            return lambda: self.calls.append(name)
+            return lambda: (self.calls.append(name), name not in self.failing)[1]
         raise AttributeError(name)
 
 
