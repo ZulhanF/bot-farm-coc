@@ -244,5 +244,7 @@ Design notes and the original implementation plan are in [`docs/superpowers/`](d
 ---
 
 <p align="center">
-  <sub>Not affiliated with Supercell. "Clash of Clans" is a trademark of Supercell Oy.</sub>
+  <sub>Not affiliated with Supercell. "Clash of Clans" is a trademark of Supercell Oy.<br>
+  Banner artwork is original. Title font: <a href="https://fonts.google.com/specimen/Lilita+One">Lilita One</a>
+  by Juan Montoreano, licensed under the <a href="https://openfontlicense.org">SIL Open Font License 1.1</a>.</sub>
 </p>
