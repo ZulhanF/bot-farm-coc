@@ -63,6 +63,15 @@ def test_missing_directory_gives_empty_library(tmp_path):
     assert lib.names() == []
 
 
+def test_uniform_template_never_matches(tmp_path):
+    cv2.imwrite(str(tmp_path / "flat.png"), np.full((20, 20), 128, dtype=np.uint8))
+    lib = TemplateLibrary.load(tmp_path, {}, threshold=0.85, margin=40)
+    assert lib.names() == ["flat"]
+    img = noise(0)
+    assert lib.find(img, "flat") is None
+    assert lib.find(img, "flat", threshold=-1.0) is None
+
+
 def test_names_sorted(tmp_path):
     img = noise(0)
     save_template(tmp_path, "b", img, (0, 0, 10, 10))

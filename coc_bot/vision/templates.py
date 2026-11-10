@@ -1,6 +1,7 @@
 """Grayscale template matching restricted to each template's calibrated box (+ margin)."""
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -55,6 +56,10 @@ class TemplateLibrary:
         template = self._templates.get(name)
         if template is None:
             return None
+        if float(template.std()) == 0.0:
+            # TM_CCOEFF_NORMED is degenerate for a zero-variance template: it scores 1.0 (or NaN)
+            # everywhere, so minMaxLoc would report the region origin as a perfect match.
+            return None
         gray = image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         region, ox, oy = gray, 0, 0
         box = self._boxes.get(name)
@@ -70,6 +75,6 @@ class TemplateLibrary:
         result = cv2.matchTemplate(region, template, cv2.TM_CCOEFF_NORMED)
         _, max_val, _, max_loc = cv2.minMaxLoc(result)
         limit = self._threshold if threshold is None else threshold
-        if max_val < limit:
+        if not math.isfinite(max_val) or max_val < limit:
             return None
         return Match(name, ox + max_loc[0], oy + max_loc[1], tw, th, float(max_val))
