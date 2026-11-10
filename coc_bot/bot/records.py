@@ -1,4 +1,4 @@
-"""Per-attack CSV log (logs/attacks-YYYY-MM-DD.csv) for loot-per-hour analysis."""
+"""Per-attack CSV log (logs/attacks-YYYY-MM-DD.csv): cycle time, damage, preview loot."""
 from __future__ import annotations
 
 import csv
@@ -8,7 +8,6 @@ from pathlib import Path
 FIELDS = (
     "time", "cycle_s", "battle_s", "damage_pct",
     "preview_gold", "preview_elixir", "preview_de",
-    "gained_gold", "gained_elixir", "gained_de",
 )
 
 

@@ -41,15 +41,11 @@ class Stats:
     skipped: int = 0
     recoveries: int = 0
     restarts: int = 0
-    gold: int = 0       # loot gained, from the result screen (0 if not calibrated)
-    elixir: int = 0
-    de: int = 0
 
     def per_hour(self, hours: float) -> str:
         if hours <= 0:
             return "n/a"
-        return (f"{self.attacks / hours:.0f} attacks/h, gold {self.gold / hours:,.0f}/h, "
-                f"elixir {self.elixir / hours:,.0f}/h, DE {self.de / hours:,.0f}/h")
+        return f"{self.attacks / hours:.0f} attacks/h"
 
 
 class Bot:
@@ -340,11 +336,6 @@ class Bot:
 
     def _record_attack(self, now: datetime) -> None:
         started = self._attack_started
-        gained = self.game.read_result_loot()
-        if gained is not None:
-            self.stats.gold += gained.gold
-            self.stats.elixir += gained.elixir
-            self.stats.de += gained.de
         cycle_s = ((started - self._prev_attack_started).total_seconds()
                    if self._prev_attack_started is not None else None)
         preview = self._preview_loot
@@ -356,14 +347,11 @@ class Bot:
             "preview_gold": preview.gold if preview else None,
             "preview_elixir": preview.elixir if preview else None,
             "preview_de": preview.de if preview else None,
-            "gained_gold": gained.gold if gained else None,
-            "gained_elixir": gained.elixir if gained else None,
-            "gained_de": gained.de if gained else None,
         }
         self._record_pending = False
         cycle = f"{cycle_s:.0f}s" if cycle_s is not None else "-"
-        log.info("Battle finished: damage %d%%, gained %s, cycle %s. %s | %s",
-                 self._last_damage, gained, cycle, self.stats, self._rate_summary())
+        log.info("Battle finished: damage %d%%, cycle %s. %s | %s",
+                 self._last_damage, cycle, self.stats, self._rate_summary())
         if self.recorder is not None:
             try:
                 self.recorder(row)

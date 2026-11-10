@@ -117,10 +117,6 @@ class FakeGame:
         self.calls.append("read_storage")
         return getattr(self, "storage", None)
 
-    def read_result_loot(self):
-        self.calls.append("read_result_loot")
-        return getattr(self, "result_loot", None)
-
     def read_damage_percent(self):
         return getattr(self, "damage_percent", None)
 

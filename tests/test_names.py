@@ -43,7 +43,8 @@ def test_complete():
 def test_valid_names():
     assert "popup_reload" in N.valid_names("template", (1,))
     assert N.valid_names("roi", (1,))[:3] == ("gold", "elixir", "de")
-    assert {"home_gold", "result_gold"} <= set(N.valid_names("roi", (1,)))
+    assert "home_gold" in N.valid_names("roi", (1,))
+    assert "result_gold" not in N.valid_names("roi", (1,))
     assert N.valid_names("point", (1, 2))[-2:] == ("troop_slot_1", "troop_slot_2")
 
 

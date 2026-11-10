@@ -152,11 +152,6 @@ class Game:
         """Own gold/elixir/DE on the home village."""
         return self._read_resources(N.HOME_ROIS)
 
-    def read_result_loot(self) -> Loot | None:
-        """Loot gained, read from the battle result screen."""
-        self.capture()
-        return self._read_resources(N.RESULT_ROIS)
-
     def deploy_army(self) -> None:
         d = self.settings.deploy
         points = self.settings.calibration.points

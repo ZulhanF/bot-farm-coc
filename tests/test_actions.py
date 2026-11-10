@@ -150,10 +150,3 @@ def test_read_storage_unreadable_counter_returns_none():
     game.capture()
     assert game.read_storage() is None
 
-
-def test_read_result_loot_takes_fresh_frame():
-    RG, RE, RD = (500, 300, 150, 30), (500, 340, 150, 30), (500, 380, 150, 30)
-    game, adb = make_game(ocr={RG: 600_000, RE: 550_000, RD: 3_000},
-                          settings=with_rois(result_gold=RG, result_elixir=RE, result_de=RD))
-    assert game.read_result_loot() == Loot(600_000, 550_000, 3_000)
-    assert adb.calls[0] == ("screencap",)

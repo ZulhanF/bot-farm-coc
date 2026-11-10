@@ -9,6 +9,8 @@ home_attack = [61, 606, 50, 28]
 popup_okay = [734, 431, 73, 47]
 
 [rois]
+home_elixir = [1080, 75, 149, 28]
+home_gold = [1073, 25, 153, 30]
 
 [points]
 map_1 = [795, 55]

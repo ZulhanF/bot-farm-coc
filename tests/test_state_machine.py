@@ -291,12 +291,11 @@ def test_not_full_storage_attacks():
     assert game.count("open_attack_menu") == 1
 
 
-def test_attack_recorded_once_with_loot_and_cycle():
+def test_attack_recorded_once_with_cycle():
     rows = []
     game = FakeGame([Screen.BASE_PREVIEW, Screen.RESULT, Screen.RESULT,
                      Screen.BASE_PREVIEW, Screen.RESULT])
     game.loot = RICH
-    game.result_loot = Loot(400_000, 300_000, 2_000)
     clock = FakeClock()
     bot = Bot(game, FakePolicy(), make_settings(), random.Random(0),
               clock=clock.now, sleep=clock.sleep, recorder=rows.append)
@@ -305,18 +304,5 @@ def test_attack_recorded_once_with_loot_and_cycle():
     assert len(rows) == 2
     assert rows[0]["cycle_s"] is None
     assert rows[1]["cycle_s"] > 0
-    assert rows[0]["gained_gold"] == 400_000 and rows[0]["preview_gold"] == RICH.gold
-    assert bot.stats.gold == 800_000 and bot.stats.de == 4_000
-
-
-def test_unreadable_result_loot_still_recorded():
-    rows = []
-    game = FakeGame([Screen.BASE_PREVIEW, Screen.RESULT])
-    game.loot = RICH
-    clock = FakeClock()
-    bot = Bot(game, FakePolicy(), make_settings(), random.Random(0),
-              clock=clock.now, sleep=clock.sleep, recorder=rows.append)
-    bot.tick()
-    bot.tick()
-    assert rows[0]["gained_gold"] is None
-    assert bot.stats.gold == 0
+    assert rows[0]["preview_gold"] == RICH.gold
+    assert "gained_gold" not in rows[0]
