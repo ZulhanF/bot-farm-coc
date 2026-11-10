@@ -68,7 +68,12 @@ class EmulatorAdb:
 
     def screencap(self) -> np.ndarray:
         data = self._cmd("exec-out", "screencap", "-p")
-        image = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+        if not data:
+            raise AdbError("screencap returned no data")
+        try:
+            image = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+        except cv2.error as exc:
+            raise AdbError(f"screencap could not be decoded: {exc}") from exc
         if image is None:
             raise AdbError("screencap returned an invalid image")
         return image

@@ -63,6 +63,12 @@ def test_screencap_invalid_bytes_raises():
         adb.screencap()
 
 
+def test_screencap_empty_output_raises():
+    adb, _ = make()
+    with pytest.raises(AdbError):
+        adb.screencap()
+
+
 def test_tap_args():
     adb, runner = make()
     adb.tap(100, 200)
