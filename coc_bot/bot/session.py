@@ -28,6 +28,12 @@ class SessionPolicy:
             return self._start <= t < self._end
         return t >= self._start or t < self._end
 
+    def _session_day(self, now: datetime) -> date:
+        """The date an overnight window opened on, so a night counts as one day."""
+        if self._start > self._end and now.time() < self._end:
+            return now.date() - timedelta(days=1)
+        return now.date()
+
     def start_play(self, now: datetime) -> None:
         self._play_started = now
         self._play_until = now + timedelta(minutes=self._rng.uniform(*self._cfg.play_minutes))
@@ -35,14 +41,15 @@ class SessionPolicy:
     def end_play(self, now: datetime) -> None:
         if self._play_started is None:
             return
-        day = self._play_started.date()
+        day = self._session_day(self._play_started)
         self._played[day] = self._played.get(day, 0.0) + (now - self._play_started).total_seconds()
         self._play_started = None
         self._play_until = None
 
     def played_seconds(self, now: datetime) -> float:
-        total = self._played.get(now.date(), 0.0)
-        if self._play_started is not None and self._play_started.date() == now.date():
+        day = self._session_day(now)
+        total = self._played.get(day, 0.0)
+        if self._play_started is not None and self._session_day(self._play_started) == day:
             total += (now - self._play_started).total_seconds()
         return total
 
@@ -56,8 +63,8 @@ class SessionPolicy:
 
     def rest_seconds(self, now: datetime) -> float:
         if not self.in_active_hours(now) or self._daily_cap_reached(now):
-            candidate = datetime.combine(now.date(), self._start)
-            if candidate <= now:
+            candidate = datetime.combine(self._session_day(now), self._start)
+            while candidate <= now:
                 candidate += timedelta(days=1)
             return (candidate - now).total_seconds()
         return self._rng.uniform(*self._cfg.break_minutes) * 60
