@@ -33,8 +33,11 @@ class DeployConfig:
     points_per_side: int = 5
     taps_per_point: int = 2
     troop_slots: tuple[int, ...] = (1,)
+    hero_slots: tuple[int, ...] = ()
+    siege_slot: int = 0
     outward_px: int = 12
     max_y: int = 600
+    pattern: str = "all"
 
 
 @dataclass(frozen=True)
@@ -43,6 +46,7 @@ class TimingConfig:
     tap_jitter_px: int = 4
     battle_timeout_s: int = 180
     stuck_timeout_s: int = 60
+    damage_stagnant_s: float = 5.0
     army_poll_s: tuple[int, int] = (60, 120)
     max_restarts: int = 3
     progress_timeout_s: int = 900   # no forward progress for this long -> recover
@@ -50,6 +54,7 @@ class TimingConfig:
 
 @dataclass(frozen=True)
 class SessionConfig:
+    enabled: bool = True
     play_minutes: tuple[int, int] = (40, 70)
     break_minutes: tuple[int, int] = (10, 25)
     active_hours: tuple[str, str] = ("08:00", "23:00")

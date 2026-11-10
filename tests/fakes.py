@@ -118,6 +118,9 @@ class FakeGame:
         self.calls.append("read_loot")
         return self.loot
 
+    def read_damage_percent(self):
+        return getattr(self, "damage_percent", None)
+
     def save_debug_screenshot(self, tag):
         self.calls.append("save_debug_screenshot")
         return None

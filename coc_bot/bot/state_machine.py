@@ -20,7 +20,6 @@ MAX_SAME_ACTION_TICKS = 5
 MAX_FAILED_ACTIONS = 5
 MAX_ADB_RECONNECTS = 3
 BATTLE_OVERRUN_S = 120
-RETRAIN_AFTER_POLLS = 10
 FORWARD_TRANSITIONS = frozenset({
     (Screen.HOME, Screen.ATTACK_MENU),
     (Screen.ATTACK_MENU, Screen.SEARCHING),
@@ -62,16 +61,16 @@ class Bot:
         self.sleep = sleep
         self.stats = Stats()
         self._stop = False
-        self._trained = False
         self._next_count = 0
         self._battle_started: datetime | None = None
+        self._last_damage: int = 0
+        self._last_damage_time: datetime | None = None
         self._last_screen: Screen | None = None
         self._same_ticks = 0
         self._wait_since: datetime | None = None
         self._recover_level = 0
         self._consecutive_restarts = 0
         self._failed_actions = 0
-        self._army_polls = 0
         self._last_progress: datetime | None = None
         self._handlers = {
             Screen.HOME: self._on_home,
@@ -218,22 +217,9 @@ class Bot:
             self.policy.start_play(self.clock())
             self._mark_progress()
             return
-        if self.game.army_ready():
-            self._army_polls = 0
-            log.info("Army ready, opening attack menu")
-            if self._act(self.game.open_attack_menu()):
-                self.sleep(self.rng.uniform(1.0, 2.0))
-            return
-        self._army_polls += 1
-        if self._army_polls >= RETRAIN_AFTER_POLLS:
-            self._trained = False
-            self._army_polls = 0
-        if not self._trained:
-            log.info("Army not ready, quick training")
-            if self._act(self.game.quick_train()):
-                self._trained = True
-        self.sleep(self.rng.uniform(*self.settings.timing.army_poll_s))
-        self._last_progress = self.clock()  # waiting for the army is legitimate
+        log.info("Opening attack menu")
+        if self._act(self.game.open_attack_menu()):
+            self.sleep(self.rng.uniform(1.0, 2.0))
 
     def _on_attack_menu(self, now: datetime) -> None:
         self._next_count = 0
@@ -259,8 +245,9 @@ class Bot:
                      "loot ok" if worth else "max_next reached", loot, self._next_count)
             self.game.deploy_army()
             self.stats.attacks += 1
-            self._trained = False
             self._battle_started = now
+            self._last_damage = 0
+            self._last_damage_time = now
             return
         self.stats.skipped += 1
         self._next_count += 1
@@ -271,13 +258,41 @@ class Bot:
     def _on_battle(self, now: datetime) -> None:
         if self._battle_started is None:
             self._battle_started = now
-        if (now - self._battle_started).total_seconds() >= self.settings.timing.battle_timeout_s:
-            log.info("Battle timeout, ending battle")
+            self._last_damage = 0
+            self._last_damage_time = now
+
+        ended = False
+        damage = self.game.read_damage_percent()
+        if damage is not None:
+            if damage > self._last_damage:
+                self._last_damage = damage
+                self._last_damage_time = now
+                log.info("Battle damage: %d%%", damage)
+
+            if damage >= 50:
+                log.info("Target 50%% reached (%d%%)! Ending battle immediately for rank win.", damage)
+                self.game.end_battle()
+                ended = True
+
+        elapsed = (now - self._battle_started).total_seconds()
+        if not ended and elapsed >= 8.0 and self._last_damage_time is not None:
+            stagnant_s = (now - self._last_damage_time).total_seconds()
+            if stagnant_s >= self.settings.timing.damage_stagnant_s:
+                log.info("Damage stagnant for %.1fs (current %d%%), ending battle early.",
+                         stagnant_s, self._last_damage)
+                self.game.end_battle()
+                ended = True
+
+        if not ended and elapsed >= self.settings.timing.battle_timeout_s:
+            log.info("Battle timeout (%.0fs), ending battle.", elapsed)
             self.game.end_battle()
+
         self.sleep(3.0)
 
     def _on_result(self, now: datetime) -> None:
         self._battle_started = None
+        self._last_damage = 0
+        self._last_damage_time = None
         log.info("Battle finished. %s", self.stats)
         self._act(self.game.return_home())
         self.sleep(self.rng.uniform(2.0, 4.0))

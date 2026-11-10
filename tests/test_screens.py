@@ -16,6 +16,7 @@ IMG = np.zeros((720, 1280, 3), np.uint8)
         ({"searching"}, Screen.SEARCHING),
         ({"btn_next", "btn_end_battle"}, Screen.BASE_PREVIEW),
         ({"btn_end_battle"}, Screen.BATTLE),
+        ({"btn_surrender"}, Screen.BATTLE),
         ({"btn_return_home"}, Screen.RESULT),
         ({"popup_reload", "home_attack"}, Screen.POPUP),
         ({"popup_okay", "btn_end_battle"}, Screen.POPUP),

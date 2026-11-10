@@ -6,6 +6,8 @@ from coc_bot.config import Settings
 # Screen markers / buttons
 HOME_ATTACK = "home_attack"          # Attack button on the home village
 BTN_FIND_MATCH = "btn_find_match"    # "Find a Match" in the attack menu
+BTN_ATTACK = "btn_attack"            # "Serang!" button in confirmation screen
+BTN_SURRENDER = "btn_surrender"      # "Menyerah" button during active battle
 BTN_NEXT = "btn_next"                # Next button while previewing an enemy base
 BTN_END_BATTLE = "btn_end_battle"    # End Battle / Surrender button
 BTN_RETURN_HOME = "btn_return_home"  # Return Home on the battle result screen
@@ -24,10 +26,12 @@ POPUP_CLOSE = "popup_close"
 POPUP_TEMPLATES = (POPUP_RELOAD, POPUP_TRY_AGAIN, POPUP_OKAY, POPUP_CLOSE)
 
 REQUIRED_TEMPLATES = (
-    HOME_ATTACK, BTN_FIND_MATCH, BTN_NEXT, BTN_END_BATTLE, BTN_RETURN_HOME,
-    BTN_ARMY, ARMY_CLOSE, ARMY_FULL, TAB_QUICK_TRAIN, BTN_TRAIN_SAVED, POPUP_OKAY,
+    HOME_ATTACK, BTN_FIND_MATCH, BTN_ATTACK, BTN_NEXT, BTN_END_BATTLE, BTN_RETURN_HOME, POPUP_OKAY,
 )
-OPTIONAL_TEMPLATES = (SEARCHING, POPUP_RELOAD, POPUP_TRY_AGAIN, POPUP_CLOSE)
+OPTIONAL_TEMPLATES = (
+    SEARCHING, POPUP_RELOAD, POPUP_TRY_AGAIN, POPUP_CLOSE, BTN_SURRENDER,
+    BTN_ARMY, ARMY_CLOSE, ARMY_FULL, TAB_QUICK_TRAIN, BTN_TRAIN_SAVED,
+)
 
 # Loot ROIs on the enemy base preview
 ROI_GOLD = "gold"
@@ -41,14 +45,26 @@ MAX_DE = 100_000
 
 # Points: map diamond corners (fully zoomed out) and troop card slots
 MAP_CORNERS = ("map_top", "map_right", "map_bottom", "map_left")
+MAP_CLOCK_POINTS = ("map_11", "map_9", "map_1", "map_3")
 
 
 def troop_slot(n: int) -> str:
     return f"troop_slot_{n}"
 
 
-def required_points(troop_slots: tuple[int, ...]) -> tuple[str, ...]:
-    return MAP_CORNERS + tuple(troop_slot(n) for n in troop_slots)
+def required_points(
+    troop_slots: tuple[int, ...],
+    pattern: str = "all",
+    hero_slots: tuple[int, ...] = (),
+    siege_slot: int = 0,
+) -> tuple[str, ...]:
+    all_slots = set(troop_slots) | set(hero_slots)
+    if siege_slot > 0:
+        all_slots.add(siege_slot)
+    slot_points = tuple(troop_slot(n) for n in sorted(all_slots))
+    if pattern in ("v_top", "clock", "lines"):
+        return MAP_CLOCK_POINTS + slot_points
+    return MAP_CORNERS + slot_points
 
 
 def valid_names(kind: str, troop_slots: tuple[int, ...]) -> tuple[str, ...]:
@@ -57,7 +73,7 @@ def valid_names(kind: str, troop_slots: tuple[int, ...]) -> tuple[str, ...]:
     if kind == "roi":
         return REQUIRED_ROIS + OPTIONAL_ROIS
     if kind == "point":
-        return required_points(troop_slots)
+        return MAP_CLOCK_POINTS + MAP_CORNERS + tuple(troop_slot(n) for n in troop_slots)
     raise ValueError(f"Unknown kind: {kind}")
 
 
@@ -67,9 +83,18 @@ def missing_calibration(settings: Settings, template_names: set[str]) -> list[st
         f"template:{n}" for n in REQUIRED_TEMPLATES
         if n not in template_names or n not in cal.templates
     ]
-    required_rois = REQUIRED_ROIS + ((ROI_DE,) if settings.loot.min_de > 0 else ())
+    if settings.loot.min_gold == 0 and settings.loot.min_elixir == 0:
+        required_rois = (ROI_DE,) if settings.loot.min_de > 0 else ()
+    else:
+        required_rois = REQUIRED_ROIS + ((ROI_DE,) if settings.loot.min_de > 0 else ())
     missing += [f"roi:{n}" for n in required_rois if n not in cal.rois]
     missing += [
-        f"point:{n}" for n in required_points(settings.deploy.troop_slots) if n not in cal.points
+        f"point:{n}" for n in required_points(
+            settings.deploy.troop_slots,
+            settings.deploy.pattern,
+            settings.deploy.hero_slots,
+            settings.deploy.siege_slot,
+        )
+        if n not in cal.points
     ]
     return missing

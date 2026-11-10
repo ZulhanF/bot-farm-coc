@@ -57,6 +57,8 @@ class SessionPolicy:
         return self.played_seconds(now) >= self._cfg.max_hours_per_day * 3600
 
     def should_rest(self, now: datetime) -> bool:
+        if not self._cfg.enabled:
+            return False
         if not self.in_active_hours(now) or self._daily_cap_reached(now):
             return True
         return self._play_until is not None and now >= self._play_until

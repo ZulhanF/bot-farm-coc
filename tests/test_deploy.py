@@ -20,6 +20,7 @@ def pts(**kw):
 def test_count():
     assert len(pts()) == 20
     assert len(pts(sides=2)) == 10
+    assert len(pts(pattern="v_top", per_side=5)) == 10
 
 
 def test_single_point_is_edge_midpoint():
@@ -49,3 +50,12 @@ def test_jitter_is_bounded():
 def test_invalid_sides(sides):
     with pytest.raises(ValueError):
         pts(sides=sides)
+
+
+def test_line_points():
+    from coc_bot.game.deploy import line_points
+    res = line_points((100, 100), (500, 500), 5, 0, random.Random(0))
+    assert len(res) == 5
+    assert res[0] == (100, 100)
+    assert res[-1] == (500, 500)
+    assert res[2] == (300, 300)

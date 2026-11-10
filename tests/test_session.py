@@ -94,3 +94,12 @@ def test_overnight_cap_rests_until_next_night():
 
 def test_overnight_outside_hours_rest():
     assert policy(NIGHT_CFG).rest_seconds(dt(12, 0, day=11)) == 10 * 3600
+
+
+def test_disabled_session_never_rests():
+    from dataclasses import replace
+    disabled_p = policy(replace(CFG, enabled=False))
+    # Outside active hours
+    assert not disabled_p.should_rest(dt(4))
+    assert not disabled_p.should_rest(dt(23))
+

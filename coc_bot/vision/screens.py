@@ -30,7 +30,9 @@ class TemplateFinder(Protocol):
 SCREEN_MARKERS: tuple[tuple[Screen, str], ...] = (
     (Screen.RESULT, N.BTN_RETURN_HOME),
     (Screen.BASE_PREVIEW, N.BTN_NEXT),
+    (Screen.BATTLE, N.BTN_SURRENDER),
     (Screen.BATTLE, N.BTN_END_BATTLE),
+    (Screen.ATTACK_MENU, N.BTN_ATTACK),
     (Screen.ATTACK_MENU, N.BTN_FIND_MATCH),
     (Screen.ARMY, N.ARMY_CLOSE),
     (Screen.HOME, N.HOME_ATTACK),

@@ -29,20 +29,10 @@ def with_loot(**kw):
     return replace(s, loot=replace(s.loot, **kw))
 
 
-def test_home_with_ready_army_opens_attack_menu():
+def test_home_opens_attack_menu():
     game = FakeGame([Screen.HOME])
     make_bot(game)[0].tick()
     assert game.count("open_attack_menu") == 1
-
-
-def test_home_trains_once_while_waiting():
-    game = FakeGame([Screen.HOME], army_ready=False)
-    bot, clock = make_bot(game)
-    bot.tick()
-    bot.tick()
-    assert game.count("quick_train") == 1
-    assert game.count("open_attack_menu") == 0
-    assert all(60 <= s <= 120 for s in clock.slept)
 
 
 def test_attack_menu_finds_match():
@@ -86,6 +76,24 @@ def test_battle_ends_after_timeout():
     for _ in range(3):
         bot.tick()
     assert game.count("end_battle") == 0
+    bot.tick()
+    assert game.count("end_battle") == 1
+
+
+def test_battle_ends_at_50_percent():
+    game = FakeGame([Screen.BATTLE])
+    game.damage_percent = 51
+    bot, _ = make_bot(game)
+    bot.tick()
+    assert game.count("end_battle") == 1
+
+
+def test_battle_ends_on_stagnant_damage():
+    game = FakeGame([Screen.BATTLE])
+    bot, clock = make_bot(game, settings=with_timing(damage_stagnant_s=5.0))
+    bot.tick()  # start battle at t=0
+    assert game.count("end_battle") == 0
+    clock.sleep(10)  # elapsed 10s, no damage increase
     bot.tick()
     assert game.count("end_battle") == 1
 
@@ -157,25 +165,6 @@ def test_home_without_forward_progress_trips_watchdog():
     assert game.count("restart_game") >= 1
 
 
-def test_waiting_for_army_does_not_trip_watchdog():
-    game = FakeGame([Screen.HOME], army_ready=False)
-    bot, clock = make_bot(game, settings=with_timing(progress_timeout_s=900))
-    for _ in range(100):
-        bot.tick()
-    assert sum(clock.slept) > 900 * 3
-    assert game.count("go_back") == 0 and bot.stats.recoveries == 0
-
-
-def test_retrains_after_ten_not_ready_polls():
-    game = FakeGame([Screen.HOME], army_ready=False)
-    bot, _ = make_bot(game)
-    for _ in range(9):
-        bot.tick()
-    assert game.count("quick_train") == 1
-    bot.tick()  # 10th not-ready poll re-arms training
-    assert game.count("quick_train") == 2
-
-
 def test_restart_does_not_consume_stuck_timer():
     game = FakeGame([Screen.UNKNOWN])
     bot, clock = make_bot(game, settings=with_timing(stuck_timeout_s=60, max_restarts=3))
@@ -240,15 +229,6 @@ def test_failed_actions_escalate_to_restart():
         bot.tick()
     assert game.count("go_back") == 1
     assert game.count("restart_game") == 1
-
-
-def test_failed_quick_train_retried():
-    game = FakeGame([Screen.HOME], army_ready=False)
-    game.failing = {"quick_train"}
-    bot, _ = make_bot(game)
-    bot.tick()
-    bot.tick()
-    assert game.count("quick_train") == 2
 
 
 def test_battle_overrun_recovers():

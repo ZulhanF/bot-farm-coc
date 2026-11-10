@@ -13,7 +13,7 @@ import numpy as np
 
 from coc_bot import names as N
 from coc_bot.config import Point, Settings
-from coc_bot.game.deploy import edge_points
+from coc_bot.game.deploy import edge_points, line_points
 from coc_bot.game.loot import Loot
 from coc_bot.vision.screens import Screen, detect_screen
 
@@ -100,14 +100,23 @@ class Game:
         return bool(ok)
 
     def close_army(self) -> bool:
-        return self.tap_template(N.ARMY_CLOSE, fresh=False)
+        if self.tap_template(N.ARMY_CLOSE, fresh=False):
+            return True
+        self.go_back()
+        return True
 
     # --- attack flow ------------------------------------------------------
     def open_attack_menu(self) -> bool:
         return self.tap_template(N.HOME_ATTACK)
 
     def find_match(self) -> bool:
-        return self.tap_template(N.BTN_FIND_MATCH, fresh=False)
+        if self.tap_template(N.BTN_FIND_MATCH, fresh=False):
+            if self.wait_for(N.BTN_ATTACK, timeout_s=3.0):
+                self.tap_template(N.BTN_ATTACK, fresh=False)
+            return True
+        if self.tap_template(N.BTN_ATTACK, fresh=False):
+            return True
+        return False
 
     def next_base(self) -> bool:
         return self.tap_template(N.BTN_NEXT, fresh=False)
@@ -122,9 +131,15 @@ class Game:
 
     def _read_loot_once(self, image: np.ndarray) -> Loot | None:
         rois = self.settings.calibration.rois
+        if N.ROI_GOLD not in rois or N.ROI_ELIXIR not in rois:
+            if self.settings.loot.min_gold == 0 and self.settings.loot.min_elixir == 0 and self.settings.loot.min_de == 0:
+                return Loot(0, 0, 0)
+            return None
         gold = self.ocr.read_number(image, rois[N.ROI_GOLD], N.MAX_GOLD)
         elixir = self.ocr.read_number(image, rois[N.ROI_ELIXIR], N.MAX_ELIXIR)
         if gold is None or elixir is None:
+            if self.settings.loot.min_gold == 0 and self.settings.loot.min_elixir == 0 and self.settings.loot.min_de == 0:
+                return Loot(0, 0, 0)
             return None
         de = self.ocr.read_number(image, rois[N.ROI_DE], N.MAX_DE) if N.ROI_DE in rois else None
         if de is None:
@@ -136,20 +151,81 @@ class Game:
     def deploy_army(self) -> None:
         d = self.settings.deploy
         points = self.settings.calibration.points
-        corners = [points[name] for name in N.MAP_CORNERS]
         height, width = self.last_image.shape[:2] if self.last_image is not None else (720, 1280)
-        targets = edge_points(corners, d.sides, d.points_per_side, d.outward_px,
-                              self.settings.timing.tap_jitter_px, self.rng, (width, height), d.max_y)
+        if all(k in points for k in ("map_11", "map_9", "map_1", "map_3")):
+            left_targets = line_points(points["map_11"], points["map_9"], d.points_per_side,
+                                       self.settings.timing.tap_jitter_px, self.rng, (width, height), d.max_y)
+            right_targets = line_points(points["map_1"], points["map_3"], d.points_per_side,
+                                        self.settings.timing.tap_jitter_px, self.rng, (width, height), d.max_y)
+            targets = left_targets + right_targets
+        else:
+            corners = [points[name] for name in N.MAP_CORNERS]
+            targets = edge_points(corners, d.sides, d.points_per_side, d.outward_px,
+                                  self.settings.timing.tap_jitter_px, self.rng, (width, height), d.max_y,
+                                  pattern=d.pattern)
         for slot in d.troop_slots:
-            self.tap(points[N.troop_slot(slot)])
-            for x, y in targets:
-                for _ in range(d.taps_per_point):
-                    self.adb.tap(x, y)
-                    self.sleep(self.rng.uniform(0.04, 0.11))
+            slot_name = N.troop_slot(slot)
+            if slot_name in points:
+                self.tap(points[slot_name])
+                for x, y in targets:
+                    for _ in range(d.taps_per_point):
+                        self.adb.tap(x, y)
+                        self.sleep(self.rng.uniform(0.04, 0.11))
+
+        def _jitter_point(pt: Point, jitter: int = 15) -> Point:
+            jx = self.rng.randint(-jitter, jitter)
+            jy = self.rng.randint(-jitter, jitter)
+            return (
+                min(max(pt[0] + jx, 0), width - 1),
+                min(max(pt[1] + jy, 0), min(height - 1, d.max_y)),
+            )
+
+        if d.siege_slot > 0:
+            siege_name = N.troop_slot(d.siege_slot)
+            if siege_name in points and targets:
+                drop_pt = _jitter_point(self.rng.choice(targets), jitter=20)
+                self.tap(points[siege_name])
+                self.tap(drop_pt)
+                self.sleep(0.2)
+
+        if d.hero_slots:
+            chosen_targets = (
+                self.rng.sample(targets, len(d.hero_slots))
+                if len(targets) >= len(d.hero_slots)
+                else [self.rng.choice(targets) for _ in d.hero_slots]
+            )
+            for slot, target_pt in zip(d.hero_slots, chosen_targets):
+                hero_name = N.troop_slot(slot)
+                if hero_name in points:
+                    card_pt = points[hero_name]
+                    drop_pt = _jitter_point(target_pt, jitter=15)
+                    self.tap(card_pt)
+                    self.tap(drop_pt)
+                    self.sleep(0.3)
+                    self.tap(card_pt)
+                    self.sleep(0.2)
 
     def end_battle(self) -> None:
-        if self.tap_template(N.BTN_END_BATTLE) and self.wait_for(N.POPUP_OKAY, timeout_s=3.0):
+        tapped = self.tap_template(N.BTN_SURRENDER) or self.tap_template(N.BTN_END_BATTLE)
+        if tapped and self.wait_for(N.POPUP_OKAY, timeout_s=3.0):
             self.tap_template(N.POPUP_OKAY, fresh=False)
+
+    def read_damage_percent(self) -> int | None:
+        image = self._image(fresh=True)
+        crop = image[520:570, 1140:1260]
+        if crop.size == 0:
+            return None
+        big = cv2.resize(crop, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+        try:
+            texts = [text for text, conf in self.ocr._engine(big) if conf >= 0.5]
+            digits = "".join(ch for text in texts for ch in text if ch.isdigit())
+            if digits:
+                val = int(digits)
+                if 0 <= val <= 100:
+                    return val
+        except Exception:
+            pass
+        return None
 
     def return_home(self) -> bool:
         return self.tap_template(N.BTN_RETURN_HOME, fresh=False)
