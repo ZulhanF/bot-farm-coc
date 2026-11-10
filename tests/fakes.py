@@ -71,3 +71,78 @@ def make_settings(**overrides):
         },
     )
     return replace(Settings(calibration=cal), **overrides)
+
+
+from datetime import datetime, timedelta
+
+from coc_bot.device.adb import AdbError
+
+
+class FakeClock:
+    def __init__(self, start=datetime(2026, 11, 10, 9, 0)):
+        self.current = start
+        self.slept = []
+
+    def now(self):
+        return self.current
+
+    def sleep(self, seconds):
+        self.slept.append(seconds)
+        self.current += timedelta(seconds=seconds)
+
+
+class FakeGame:
+    def __init__(self, screens, loot=None, army_ready=True):
+        self.screens = list(screens)
+        self.loot = loot
+        self._army_ready = army_ready
+        self.fail_screen_times = 0
+        self.calls = []
+
+    def count(self, name):
+        return sum(1 for c in self.calls if c == name)
+
+    def screen(self):
+        if self.fail_screen_times > 0:
+            self.fail_screen_times -= 1
+            raise AdbError("boom")
+        return self.screens.pop(0) if len(self.screens) > 1 else self.screens[0]
+
+    def army_ready(self):
+        self.calls.append("army_ready")
+        return self._army_ready
+
+    def read_loot(self):
+        self.calls.append("read_loot")
+        return self.loot
+
+    def save_debug_screenshot(self, tag):
+        self.calls.append("save_debug_screenshot")
+        return None
+
+    def __getattr__(self, name):
+        if name in {"quick_train", "close_army", "open_attack_menu", "find_match", "next_base",
+                    "deploy_army", "end_battle", "return_home", "dismiss_popup", "go_back",
+                    "restart_game", "reconnect"}:
+            return lambda: self.calls.append(name)
+        raise AttributeError(name)
+
+
+class FakePolicy:
+    def __init__(self, rest=False, rest_s=600.0):
+        self.rest = rest
+        self.rest_s = rest_s
+        self.events = []
+
+    def start_play(self, now):
+        self.events.append("start")
+
+    def end_play(self, now):
+        self.events.append("end")
+
+    def should_rest(self, now):
+        return self.rest
+
+    def rest_seconds(self, now):
+        self.rest = False
+        return self.rest_s
