@@ -15,7 +15,7 @@ from coc_bot.vision.screens import Screen
 
 log = logging.getLogger(__name__)
 
-ACTION_SCREENS = frozenset({Screen.POPUP, Screen.ATTACK_MENU, Screen.RESULT, Screen.ARMY})
+ACTION_SCREENS = frozenset({Screen.POPUP, Screen.ATTACK_MENU, Screen.RESULT})
 WAIT_SCREENS = frozenset({Screen.UNKNOWN, Screen.SEARCHING})
 MAX_SAME_ACTION_TICKS = 5
 MAX_FAILED_ACTIONS = 5
@@ -75,6 +75,7 @@ class Bot:
         self._record_pending = False
         self._spells_cast = False
         self._stop = False
+        self.check_storage = True   # the dashboard can switch the storage-full check off while running
         self._next_count = 0
         self._battle_started: datetime | None = None
         self._last_damage: int = 0
@@ -89,7 +90,6 @@ class Bot:
         self._handlers = {
             Screen.HOME: self._on_home,
             Screen.ATTACK_MENU: self._on_attack_menu,
-            Screen.ARMY: self._on_army,
             Screen.SEARCHING: self._on_searching,
             Screen.BASE_PREVIEW: self._on_base_preview,
             Screen.BATTLE: self._on_battle,
@@ -255,10 +255,6 @@ class Bot:
         self._act(self.game.find_match())
         self.sleep(self.rng.uniform(1.0, 2.0))
 
-    def _on_army(self, now: datetime) -> None:
-        self._act(self.game.close_army())
-        self.sleep(1.0)
-
     def _on_searching(self, now: datetime) -> None:
         self.sleep(1.0)
 
@@ -348,6 +344,8 @@ class Bot:
     # --- storage / records --------------------------------------------------
     def _storage_is_full(self, now: datetime) -> bool:
         cfg = self.settings.storage
+        if not self.check_storage:
+            return False
         levels = self.game.storage_levels()
         if not levels:
             return False
@@ -366,13 +364,14 @@ class Bot:
 
     def _log_storage_check(self) -> None:
         checks = N.storage_checks(self.settings)
-        if checks:
-            log.info("Storage check on: %s (stop when all >= %.0f%%)",
-                     ", ".join(f"{res} ({method})" for res, method in checks),
+        if not self.check_storage:
+            log.warning("Storage check switched OFF: the bot attacks even with full storages")
+        elif checks:
+            log.info("Storage check on: %s (stop when all >= %.0f%%)", ", ".join(checks),
                      self.settings.storage.full_ratio * 100)
         else:
             log.warning("Storage check is OFF: calibrate roi home_gold_bar / home_elixir_bar / "
-                        "home_de_bar (or set [storage] caps) to stop when storages are full")
+                        "home_de_bar to stop when storages are full")
 
     def _record_attack(self, now: datetime) -> None:
         started = self._attack_started

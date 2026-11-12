@@ -46,7 +46,7 @@
 - **Fast win farming** — attacks, waits until **50 % destruction** (one star = win and league bonus),
   then surrenders early to start the next battle. Built for the *Clash Anytime* era with no training time.
 - **Loot filter** — reads the enemy's available Gold / Elixir / Dark Elixir with OCR and skips bases below
-  your thresholds, with a cap on how many times it presses *Next*.
+  your thresholds, with a cap on how many times it presses *Next*. With all minimums at `0` the loot OCR is skipped.
 - **Configurable deployment** — troops along calibrated "clock" lines or the map diamond (`v_top`,
   `v_bottom`, `all`), plus siege machine and heroes with automatic ability activation.
 - **Spells** — drops spells such as Rage in rows like the troops, shifted forward in front of them,
@@ -131,10 +131,9 @@ on a live screenshot: drag a box, press **Enter** to save, **C** to cancel.
 | Kind | Names | Where |
 |---|---|---|
 | `template` (required) | `home_attack`, `btn_find_match`, `btn_attack`, `btn_next`, `btn_end_battle`, `btn_return_home`, `popup_okay` | the screen where each button is visible |
-| `template` (optional) | `btn_surrender`, `searching`, `army_close`, `popup_reload`, `popup_try_again`, `popup_close` | as they appear |
-| `roi` | `gold`, `elixir`, `de` | enemy base preview — only the loot digits, no icon |
+| `template` (optional) | `btn_surrender`, `searching`, `popup_reload`, `popup_try_again`, `popup_close` | as they appear |
+| `roi` | `gold`, `elixir`, `de` | enemy base preview — only the loot digits, no icon (only needed with a loot filter) |
 | `roi` | `home_gold_bar`, `home_elixir_bar`, `home_de_bar` | your village, top-right resource **bars** — the coloured bar from its left end to just before the icon |
-| `roi` | `home_gold`, `home_elixir`, `home_de` | *(optional fallback)* the counters' digits, used with `[storage]` caps |
 | `point` | `map_11`, `map_9`, `map_1`, `map_3` | edges of the battlefield for the deploy lines |
 | `point` | `troop_slot_N` | each troop / siege / hero / spell card in the bottom bar |
 | `point` | `map_center` | middle of the enemy base — spells aim from the deploy line towards it |
@@ -161,7 +160,7 @@ Calibration data is written to `calibration.toml` by the `calibrate` command.
 | `[deploy]` | `pattern`, `points_per_side`, `taps_per_point`, `troop_slots`, `siege_slot`, `hero_slots` |
 | `[spells]` | `slots`, `casts` (split over the troop rows), `delay_s`, `depth` — `0` on the troop line, `1` at `map_center` |
 | `[timing]` | `battle_timeout_s`, `damage_stagnant_s`, `tap_delay_ms`, `tap_jitter_px`, `progress_timeout_s` |
-| `[storage]` | `full_ratio`, `on_full` (`"stop"` / `"wait"`), `wait_minutes`; optional `gold_cap` / `elixir_cap` / `de_cap` |
+| `[storage]` | `full_ratio`, `on_full` (`"stop"` / `"wait"`), `wait_minutes` |
 | `[session]` | `enabled`, `play_minutes`, `break_minutes`, `active_hours`, `max_hours_per_day` |
 
 Example for quick win farming with a storage check:
@@ -201,15 +200,16 @@ least 120 columns wide, such as Windows Terminal.
 | Key | Page | What you get |
 |---|---|---|
 | `1` | Beranda | Neofetch-style overview: emulator online, resolution, calibration, storage bars, deploy / spell / loot / session settings |
-| `2` | Bot | Start, pause / resume, stop; live status (screen, attacks, recoveries) and live log |
+| `2` | Bot | Start, pause / resume, stop; storage-check switch; live status (screen, attacks, recoveries) and live log |
 | `3` | Mode | What to run when started — `home` today; `builder`, `walls`, `auto` are planned |
-| `4` | Kalibrasi | Every template / ROI / point with ✓ / ✗; **Enter** opens the calibration window for that item |
+| `4` | Kalibrasi | The items your settings use, with ✓ / ✗ (**A** shows all); **Enter** opens the calibration window for that item |
 | `5` | Pengaturan | Edit `settings.toml`; **Ctrl+S** validates before saving |
 | `6` | Log | Today's log file, coloured by level |
 | `7` | Statistik | Attacks, wins ≥ 50 %, average cycle / battle / damage, attacks per hour chart, recent attacks |
 | `8` | Tes vision | Screenshot the emulator and show the detected screen, template scores, bars and OCR |
 
-`S` starts or stops the bot from any page, `P` pauses, `R` refreshes, `Q` stops the bot and quits.
+`S` starts or stops the bot from any page, `P` pauses, `C` switches the storage-full check off / on (to test
+with full storages; back on at the next launch), `R` refreshes, `Q` stops the bot and quits.
 `Ctrl+P` opens the command palette (for example to change the colour theme).
 
 ## Usage

@@ -53,3 +53,12 @@ def test_sleep_blocks_while_paused(tmp_path):
     runner._sleep(0.05)
     assert time.monotonic() - t0 >= 0.5
     assert runner.status().state is State.RUNNING
+
+
+def test_storage_check_switch_reaches_the_running_bot(tmp_path):
+    class FakeBot:
+        check_storage = True
+    runner = BotRunner(tmp_paths(tmp_path))
+    runner._bot = FakeBot()
+    runner.set_check_storage(False)
+    assert runner.check_storage is False and runner._bot.check_storage is False

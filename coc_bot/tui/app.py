@@ -70,6 +70,7 @@ class DashboardApp(App):
         *[Binding(key, f"page('{pid}')", label, show=False) for pid, key, label, _cls in PAGES],
         Binding("s", "toggle_run", "Start/Stop"),
         Binding("p", "pause", "Jeda/Lanjut"),
+        Binding("c", "toggle_storage", "Cek storage"),
         Binding("r", "refresh", "Segarkan"),
         Binding("q", "quit", "Keluar"),
     ]
@@ -148,6 +149,16 @@ class DashboardApp(App):
         self.runner.mode = mode
         self._tick()
 
+    def set_check_storage(self, on: bool) -> None:
+        self.runner.set_check_storage(on)
+        self.notify("Cek storage penuh ON" if on else
+                    "Cek storage penuh OFF: bot tetap menyerang walau storage penuh",
+                    severity="information" if on else "warning")
+        self._tick()
+
+    def action_toggle_storage(self) -> None:
+        self.set_check_storage(not self.runner.check_storage)
+
     def action_start(self) -> None:
         if self.runner.start(self.mode):
             self.notify(f"Bot dimulai (mode {self.mode.value})")
@@ -209,6 +220,8 @@ class DashboardApp(App):
             if status.started_at:
                 bar.append_text(Text.assemble(("  │  ", "dim"), ("durasi ", "dim"),
                                               str(datetime.now() - status.started_at).split(".")[0]))
+        if not self.runner.check_storage:
+            bar.append_text(Text.assemble(("  │  ", "dim"), ("cek storage OFF", "bold yellow")))
         if status.error and status.state is State.ERROR:
             bar.append_text(Text.assemble(("  │  ", "dim"), (status.error[:80], "red")))
         self.query_one("#statusbar", Static).update(bar)

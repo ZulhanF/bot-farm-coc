@@ -13,7 +13,6 @@ from coc_bot.vision.templates import Match
 class Screen(Enum):
     HOME = "home"
     ATTACK_MENU = "attack_menu"
-    ARMY = "army"
     SEARCHING = "searching"
     BASE_PREVIEW = "base_preview"
     BATTLE = "battle"
@@ -34,7 +33,6 @@ SCREEN_MARKERS: tuple[tuple[Screen, str], ...] = (
     (Screen.BATTLE, N.BTN_END_BATTLE),
     (Screen.ATTACK_MENU, N.BTN_ATTACK),
     (Screen.ATTACK_MENU, N.BTN_FIND_MATCH),
-    (Screen.ARMY, N.ARMY_CLOSE),
     (Screen.HOME, N.HOME_ATTACK),
     (Screen.SEARCHING, N.SEARCHING),
 )

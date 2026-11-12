@@ -12,7 +12,6 @@ IMG = np.zeros((720, 1280, 3), np.uint8)
     [
         ({"home_attack"}, Screen.HOME),
         ({"btn_find_match"}, Screen.ATTACK_MENU),
-        ({"army_close"}, Screen.ARMY),
         ({"searching"}, Screen.SEARCHING),
         ({"btn_next", "btn_end_battle"}, Screen.BASE_PREVIEW),
         ({"btn_end_battle"}, Screen.BATTLE),

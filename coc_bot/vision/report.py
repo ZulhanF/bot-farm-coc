@@ -37,8 +37,7 @@ class VisionReport:
 def bar_levels(image: np.ndarray, settings: Settings) -> dict[str, float | None]:
     """Fill of every calibrated home resource bar, by resource."""
     rois = settings.calibration.rois
-    return {res: bar_fill(image, rois[bar], BAR_HUES[res])
-            for res, bar, _counter, _cap in N.STORAGE_RESOURCES if bar in rois}
+    return {res: bar_fill(image, rois[bar], BAR_HUES[res]) for res, bar in N.STORAGE_BARS if bar in rois}
 
 
 def analyse(image: np.ndarray, settings: Settings, templates: TemplateLibrary, reader=None) -> VisionReport:
@@ -52,11 +51,13 @@ def analyse(image: np.ndarray, settings: Settings, templates: TemplateLibrary, r
             scores.append(TemplateScore(name, found.score, found.center,
                                         found.score >= settings.vision.threshold))
     readings = []
-    bars = {bar: res for res, bar, _counter, _cap in N.STORAGE_RESOURCES}
+    bars = {bar: res for res, bar in N.STORAGE_BARS}
     for name, roi in settings.calibration.rois.items():
         if name in bars:
             readings.append(RoiReading(name, "bar", bar_fill(image, roi, BAR_HUES[bars[name]])))
             continue
+        if name not in N.ROI_LIMITS:
+            continue   # not a ROI the bot reads (e.g. left over from an older version)
         if reader is None:
             from coc_bot.vision.ocr import OcrReader, rapidocr_engine
             reader = OcrReader(rapidocr_engine())

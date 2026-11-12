@@ -114,13 +114,23 @@ Page {
 }
 
 #bot-buttons {
-    width: 24;
+    width: 30;
     height: auto;
 }
 
 #bot-buttons Button {
     width: 100%;
     margin: 0 0 1 0;
+}
+
+#storage-toggle {
+    height: auto;
+}
+
+#sw-storage-label {
+    width: 1fr;
+    padding: 0 0 0 1;
+    color: $text-muted;
 }
 
 #bot-log {

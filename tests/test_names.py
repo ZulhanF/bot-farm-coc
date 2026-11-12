@@ -43,18 +43,10 @@ def test_complete():
 def test_valid_names():
     assert "popup_reload" in N.valid_names("template", (1,))
     assert N.valid_names("roi", (1,))[:3] == ("gold", "elixir", "de")
-    assert "home_gold" in N.valid_names("roi", (1,))
+    assert "home_gold_bar" in N.valid_names("roi", (1,))
+    assert "home_gold" not in N.valid_names("roi", (1,))
     assert "result_gold" not in N.valid_names("roi", (1,))
     assert N.valid_names("point", (1, 2))[-2:] == ("troop_slot_1", "troop_slot_2")
-
-
-def test_home_roi_required_only_for_capped_resources():
-    from dataclasses import replace
-    settings = Settings(calibration=full_calibration())
-    settings = replace(settings, storage=replace(settings.storage, gold_cap=1000))
-    missing = N.missing_calibration(settings, set(N.REQUIRED_TEMPLATES))
-    assert "roi:home_gold" in missing
-    assert "roi:home_elixir" not in missing
 
 
 def test_spells_require_center_and_card_points():
@@ -67,12 +59,24 @@ def test_spells_require_center_and_card_points():
     assert "map_center" in N.valid_names("point", (1,))
 
 
-def test_storage_checks_prefer_bar_over_cap():
-    from dataclasses import replace
+def test_storage_checks_are_the_calibrated_bars():
     cal = full_calibration().with_entry("rois", "home_gold_bar", (1000, 30, 230, 24))
-    settings = Settings(calibration=cal)
-    settings = replace(settings, storage=replace(settings.storage, gold_cap=1000, elixir_cap=1000))
-    assert N.storage_checks(settings) == [("gold", "bar"), ("elixir", "cap")]
-    missing = N.missing_calibration(settings, set(N.REQUIRED_TEMPLATES))
-    assert "roi:home_gold" not in missing      # bar replaces the counter
-    assert "roi:home_elixir" in missing
+    assert N.storage_checks(Settings(calibration=cal)) == ["gold"]
+
+
+def test_relevant_names_follow_settings():
+    from dataclasses import replace
+    settings = Settings(calibration=full_calibration())
+    settings = replace(settings, deploy=replace(settings.deploy, pattern="v_top"),
+                       loot=replace(settings.loot, min_gold=0, min_elixir=0, min_de=0))
+    items = N.relevant_names(settings)
+    assert ("point", "map_11") in items and ("point", "map_top") not in items
+    assert ("roi", "gold") not in items           # loot filter off: no loot OCR
+    assert ("point", "map_center") not in items   # no spells
+    assert ("roi", "home_gold_bar") in items
+    settings = replace(settings, deploy=replace(settings.deploy, pattern="all"),
+                       loot=replace(settings.loot, min_gold=1), spells=replace(settings.spells, slots=(6,)))
+    items = N.relevant_names(settings)
+    assert ("point", "map_top") in items and ("point", "map_11") not in items
+    assert ("roi", "gold") in items and ("point", "map_center") in items
+    assert ("point", "troop_slot_6") in items

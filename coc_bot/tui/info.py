@@ -23,7 +23,7 @@ class SystemInfo:
     screen: str | None = None
     missing: list[str] = field(default_factory=list)
     storage: dict[str, float | None] = field(default_factory=dict)
-    storage_checks: list[tuple[str, str]] = field(default_factory=list)
+    storage_checks: list[str] = field(default_factory=list)
     full_ratio: float = 0.95
     on_full: str = "stop"
     pattern: str = "-"

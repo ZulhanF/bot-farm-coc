@@ -14,7 +14,7 @@ from rich.text import Text
 from textual import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import Button, DataTable, OptionList, RichLog, Sparkline, Static, TextArea
+from textual.widgets import Button, DataTable, Label, OptionList, RichLog, Sparkline, Static, Switch, TextArea
 from textual.widgets.option_list import Option
 
 from coc_bot import names as N
@@ -126,10 +126,11 @@ class HomePage(Page):
         self.app.call_from_thread(self._show_info, info)
 
     def _show_info(self, info: SystemInfo) -> None:
-        self.query_one("#sysinfo", Static).update(self.render_info(info, self.dash.mode))
+        self.query_one("#sysinfo", Static).update(
+            self.render_info(info, self.dash.mode, self.dash.runner.check_storage))
 
     @staticmethod
-    def render_info(info: SystemInfo, mode: Mode) -> Table:
+    def render_info(info: SystemInfo, mode: Mode, check_storage: bool = True) -> Table:
         table = Table.grid(padding=(0, 2))
         table.add_column(style="bold #ffc83d", no_wrap=True)
         table.add_column()
@@ -152,9 +153,13 @@ class HomePage(Page):
                 table.add_row(f"Storage {RESOURCE_NAMES[res]}", meter(level, RESOURCE_COLORS[res]))
         elif info.storage_checks and info.online:
             table.add_row("Storage", Text("buka desa untuk membaca bar", style="dim"))
-        checks = ", ".join(f"{RESOURCE_NAMES[r]}({m})" for r, m in info.storage_checks)
-        table.add_row("Cek penuh", Text(f"{checks} ≥{info.full_ratio:.0%} → {info.on_full}") if checks
-                      else Text("OFF (kalibrasi bar storage)", style="yellow"))
+        checks = ", ".join(RESOURCE_NAMES[r] for r in info.storage_checks)
+        if not check_storage:
+            table.add_row("Cek penuh", Text("OFF (dimatikan, tombol C)", style="yellow"))
+        elif checks:
+            table.add_row("Cek penuh", Text(f"ON: {checks} ≥{info.full_ratio:.0%} → {info.on_full}"))
+        else:
+            table.add_row("Cek penuh", Text("OFF (kalibrasi bar storage)", style="yellow"))
         table.add_row("Mode", Text(mode.value, style="bold"))
         table.add_row("Deploy", f"{info.pattern}, slot {', '.join(map(str, info.troop_slots)) or '-'}")
         table.add_row("Spell", f"slot {', '.join(map(str, info.spell_slots))}" if info.spell_slots else "off")
@@ -179,6 +184,9 @@ class BotPage(Page):
                 yield Button("▶ Mulai", id="btn-start", variant="success")
                 yield Button("⏸ Jeda", id="btn-pause", variant="warning")
                 yield Button("■ Stop", id="btn-stop", variant="error")
+                with Horizontal(id="storage-toggle"):
+                    yield Switch(value=True, id="sw-storage")
+                    yield Label("Cek storage\npenuh (C)", id="sw-storage-label")
         yield RichLog(id="bot-log", max_lines=3000, wrap=True, classes="panel")
 
     def on_mount(self) -> None:
@@ -192,6 +200,10 @@ class BotPage(Page):
                    "btn-stop": self.dash.action_stop}
         if event.button.id in actions:
             actions[event.button.id]()
+
+    def on_switch_changed(self, event: Switch.Changed) -> None:
+        if event.switch.id == "sw-storage" and event.value != self.dash.runner.check_storage:
+            self.dash.set_check_storage(event.value)
 
     def write_log(self, line: str) -> None:
         self.query_one("#bot-log", RichLog).write(log_line(line))
@@ -214,9 +226,14 @@ class BotPage(Page):
             table.add_row("Serangan", str(status.stats.attacks))
         table.add_row("Dilewati", str(status.stats.skipped))
         table.add_row("Recovery", f"{status.stats.recoveries} (restart {status.stats.restarts})")
+        table.add_row("Cek storage", Text("ON", style="green") if self.dash.runner.check_storage
+                      else Text("OFF (tetap menyerang walau penuh)", style="yellow"))
         if status.error:
             table.add_row("Error", Text(status.error, style="red"))
         self.query_one("#bot-status", Static).update(table)
+        switch = self.query_one("#sw-storage", Switch)
+        if switch.value != self.dash.runner.check_storage:
+            switch.value = self.dash.runner.check_storage
         self.query_one("#btn-start", Button).disabled = self.dash.runner.active
         pause = self.query_one("#btn-pause", Button)
         pause.label = "⏵ Lanjut" if status.state is State.PAUSED else "⏸ Jeda"
@@ -264,16 +281,23 @@ class ModePage(Page):
 
 # --- 4. Kalibrasi ----------------------------------------------------------------------------------
 class CalibrationPage(Page):
+    BINDINGS = [("a", "toggle_all", "Semua item")]
+
     def compose(self) -> ComposeResult:
         yield Static("Enter = kalibrasi item terpilih: jendela OpenCV terbuka dengan screenshot emulator. "
-                     "Seret kotak, ENTER simpan, C batal.  R = cek ulang.", classes="hint")
+                     "Seret kotak, ENTER simpan, C batal.  A = tampilkan semua / hanya yang dipakai.",
+                     classes="hint")
         yield Static(id="cal-summary")
         yield DataTable(id="cal-table", cursor_type="row", zebra_stripes=True, classes="panel")
 
     def on_mount(self) -> None:
+        self._show_all = False
         table = self.query_one("#cal-table", DataTable)
-        table.border_title = "item kalibrasi"
         table.add_columns("", "jenis", "nama", "nilai", "keterangan")
+
+    def action_toggle_all(self) -> None:
+        self._show_all = not self._show_all
+        self.refresh_page()
 
     def refresh_page(self) -> None:
         table = self.query_one("#cal-table", DataTable)
@@ -288,24 +312,32 @@ class CalibrationPage(Page):
         missing = set(N.missing_calibration(settings, set(templates.names())))
         cal = settings.calibration
         have = {"template": cal.templates, "roi": cal.rois, "point": cal.points}
+        relevant = N.relevant_names(settings)
+        if self._show_all:
+            items = [(k, n) for k in ("template", "roi", "point")
+                     for n in N.valid_names(k, N.used_slots(settings))]
+        else:
+            items = relevant
         rows = []
-        for kind in ("template", "roi", "point"):
-            for name in N.valid_names(kind, N.used_slots(settings)):
-                key = f"{kind}:{name}"
-                value = have[kind].get(name)
-                if kind == "template" and name not in templates.names():
-                    value = None
-                if key in missing:
-                    mark, note = Text("✗", style="bold red"), Text("wajib, belum ada", style="red")
-                elif value is not None:
-                    mark, note = Text("✓", style="green"), Text("")
-                else:
-                    mark, note = Text("·", style="dim"), Text("opsional", style="dim")
-                rows.append((key in missing, kind, name, mark, value, note))
-        rows.sort(key=lambda r: not r[0])  # missing first
-        for _miss, kind, name, mark, value, note in rows:
+        for kind, name in items:
+            key = f"{kind}:{name}"
+            value = have[kind].get(name)
+            if kind == "template" and name not in templates.names():
+                value = None
+            if key in missing:
+                mark, note = Text("✗", style="bold red"), Text("wajib, belum ada", style="red")
+            elif value is not None:
+                mark, note = Text("✓", style="green"), Text("")
+            elif (kind, name) in relevant:
+                mark, note = Text("·", style="dim"), Text("opsional", style="dim")
+            else:
+                mark, note = Text("·", style="dim"), Text("tidak dipakai setting sekarang", style="dim")
+            rows.append((key not in missing, value is None, kind, name, mark, value, note))
+        rows.sort(key=lambda r: (r[0], r[1]))   # missing first, then calibrated, then unset
+        for _ok, _unset, kind, name, mark, value, note in rows:
             table.add_row(mark, kind, name, "-" if value is None else str(list(value)), note,
                           key=f"{kind}:{name}")
+        table.border_title = "semua item" if self._show_all else "item yang dipakai setting sekarang"
         summary.update(Text(f"  ✓ Kalibrasi lengkap ({len(rows)} item)", style="green") if not missing
                        else Text(f"  ✗ {len(missing)} item wajib belum dikalibrasi", style="bold red"))
 

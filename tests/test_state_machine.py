@@ -101,7 +101,6 @@ def test_battle_ends_on_stagnant_damage():
 @pytest.mark.parametrize("screen, call", [
     (Screen.RESULT, "return_home"),
     (Screen.POPUP, "dismiss_popup"),
-    (Screen.ARMY, "close_army"),
 ])
 def test_simple_handlers(screen, call):
     game = FakeGame([screen])
@@ -278,6 +277,16 @@ def test_full_storage_wait_mode_sleeps_then_rechecks():
     assert clock.slept == [1800]
     game.levels = {"gold": 0.2, "elixir": 0.3}
     bot.tick()
+    assert game.count("open_attack_menu") == 1
+
+
+def test_storage_check_switched_off_attacks_with_full_storage():
+    game = FakeGame([Screen.HOME])
+    game.levels = {"gold": 1.0, "elixir": 1.0, "de": 1.0}
+    bot, _ = make_bot(game)
+    bot.check_storage = False
+    bot.tick()
+    assert game.count("storage_levels") == 0
     assert game.count("open_attack_menu") == 1
 
 

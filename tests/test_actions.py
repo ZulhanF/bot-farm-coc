@@ -162,24 +162,13 @@ def test_storage_levels_from_bars_need_no_capacity():
     assert levels["gold"] >= 0.97 and abs(levels["elixir"] - 0.5) < 0.04
 
 
-def test_storage_levels_from_counter_and_cap():
-    HG = (900, 20, 150, 25)
-    s = with_rois(home_gold=HG)
-    s = replace(s, storage=replace(s.storage, gold_cap=10_000_000))
-    game, _ = make_game(ocr={HG: 9_000_000}, settings=s)
+def test_read_loot_skips_ocr_when_filter_off():
+    s = make_settings()
+    s = replace(s, loot=replace(s.loot, min_gold=0, min_elixir=0, min_de=0))
+    rois = s.calibration.rois
+    game, _ = make_game(ocr={rois["gold"]: 1, rois["elixir"]: 2}, settings=s)
     game.capture()
-    assert game.storage_levels() == {"gold": 0.9}
-
-
-def test_bar_wins_over_cap_and_unreadable_counter_is_none():
-    HE = (900, 60, 150, 25)
-    s = with_rois(home_gold_bar=GOLD_BAR, home_elixir=HE)
-    s = replace(s, storage=replace(s.storage, gold_cap=10_000_000, elixir_cap=10_000_000))
-    game, adb = make_game(ocr={}, settings=s)
-    adb.image = bar_screen(1.0, 0.0)
-    game.capture()
-    levels = game.storage_levels()
-    assert levels["gold"] >= 0.97 and levels["elixir"] is None
+    assert game.read_loot() is None   # OCR would have read Loot(1, 2, 0)
 
 
 def spell_game(depth=0.5, casts=2, center=(640, 360)):

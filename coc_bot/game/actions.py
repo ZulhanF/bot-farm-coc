@@ -82,13 +82,6 @@ class Game:
             self.sleep(interval_s)
             waited += interval_s
 
-    # --- army window (only closed if it opens by accident) ----------------
-    def close_army(self) -> bool:
-        if self.tap_template(N.ARMY_CLOSE, fresh=False):
-            return True
-        self.go_back()
-        return True
-
     # --- attack flow ------------------------------------------------------
     def open_attack_menu(self) -> bool:
         return self.tap_template(N.HOME_ATTACK)
@@ -106,6 +99,8 @@ class Game:
         return self.tap_template(N.BTN_NEXT, fresh=False)
 
     def read_loot(self) -> Loot | None:
+        if not N.loot_filter_on(self.settings):
+            return None   # every base is attacked: skip the OCR
         for attempt in range(2):
             image = self._image(fresh=attempt > 0)
             loot = self._read_loot_once(image)
@@ -133,24 +128,13 @@ class Game:
         return Loot(gold, elixir, de)
 
     def storage_levels(self) -> dict[str, float | None]:
-        """How full each checked storage is (0..1), from its bar or from counter / cap.
-
-        Empty dict = no storage check configured. None = that resource could not be read.
-        """
-        checks = N.storage_checks(self.settings)
-        if not checks:
+        """How full each calibrated storage bar is (0..1); empty dict = no bar calibrated."""
+        rois = self.settings.calibration.rois
+        if not N.storage_checks(self.settings):
             return {}
         image = self._image(fresh=False)
-        rois = self.settings.calibration.rois
-        levels: dict[str, float | None] = {}
-        for resource, bar_roi, counter_roi, cap_field in N.STORAGE_RESOURCES:
-            method = dict(checks).get(resource)
-            if method == "bar":
-                levels[resource] = bar_fill(image, rois[bar_roi], BAR_HUES[resource])
-            elif method == "cap":
-                amount = self.ocr.read_number(image, rois[counter_roi], N.ROI_LIMITS[counter_roi])
-                levels[resource] = None if amount is None else amount / getattr(self.settings.storage, cap_field)
-        return levels
+        return {res: bar_fill(image, rois[bar], BAR_HUES[res])
+                for res, bar in N.STORAGE_BARS if bar in rois}
 
     def deploy_army(self) -> None:
         d = self.settings.deploy

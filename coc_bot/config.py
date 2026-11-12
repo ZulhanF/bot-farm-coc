@@ -61,10 +61,7 @@ class TimingConfig:
 
 @dataclass(frozen=True)
 class StorageConfig:
-    gold_cap: int = 0        # your storage capacity; 0 = don't check this resource
-    elixir_cap: int = 0
-    de_cap: int = 0
-    full_ratio: float = 0.95  # "full" = amount >= cap * full_ratio
+    full_ratio: float = 0.95  # "full" = every calibrated resource bar is at least this full
     on_full: str = "stop"     # "stop" = end the run, "wait" = sleep wait_minutes then check again
     wait_minutes: int = 30
 

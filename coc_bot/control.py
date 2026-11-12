@@ -86,6 +86,7 @@ class BotRunner:
     def __init__(self, paths: Paths | None = None, mode: Mode = Mode.HOME) -> None:
         self.paths = paths or Paths()
         self.mode = mode
+        self.check_storage = True   # False = keep attacking with full storages (testing)
         self._state = State.IDLE
         self._error: str | None = None
         self._bot: Bot | None = None
@@ -135,6 +136,14 @@ class BotRunner:
             self._state = State.RUNNING
             self._running.set()
             log.info("Resumed")
+
+    def set_check_storage(self, on: bool) -> None:
+        """Switch the storage-full check; applies at once to a running bot."""
+        self.check_storage = on
+        if self._bot is not None:
+            self._bot.check_storage = on
+        if self.active:
+            log.info("Storage check %s", "ON" if on else "OFF (attacking even with full storages)")
 
     def join(self, timeout: float | None = None) -> None:
         if self._thread is not None:
@@ -191,6 +200,7 @@ class BotRunner:
             self._bot = Bot(game, SessionPolicy(settings.session, rng), settings, rng,
                             clock=datetime.now, sleep=self._sleep,
                             recorder=CsvRecorder(self.paths.logs))
+            self._bot.check_storage = self.check_storage
             if self._stop.is_set():
                 return 0
             self._state = State.RUNNING
