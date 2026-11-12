@@ -37,9 +37,14 @@ ROI_HOME_GOLD = "home_gold"
 ROI_HOME_ELIXIR = "home_elixir"
 ROI_HOME_DE = "home_de"
 HOME_ROIS = (ROI_HOME_GOLD, ROI_HOME_ELIXIR, ROI_HOME_DE)
+# Own resource bars (the coloured fill, without the icon) -> storage-full check without any capacity
+ROI_HOME_GOLD_BAR = "home_gold_bar"
+ROI_HOME_ELIXIR_BAR = "home_elixir_bar"
+ROI_HOME_DE_BAR = "home_de_bar"
+HOME_BAR_ROIS = (ROI_HOME_GOLD_BAR, ROI_HOME_ELIXIR_BAR, ROI_HOME_DE_BAR)
 
 REQUIRED_ROIS = (ROI_GOLD, ROI_ELIXIR)
-OPTIONAL_ROIS = (ROI_DE,) + HOME_ROIS
+OPTIONAL_ROIS = (ROI_DE,) + HOME_BAR_ROIS + HOME_ROIS
 MAX_GOLD = 5_000_000
 MAX_ELIXIR = 5_000_000
 MAX_DE = 100_000
@@ -75,6 +80,29 @@ def required_points(
     return MAP_CORNERS + slot_points
 
 
+# resource -> (bar ROI, counter ROI, StorageConfig cap field)
+STORAGE_RESOURCES = (
+    ("gold", ROI_HOME_GOLD_BAR, ROI_HOME_GOLD, "gold_cap"),
+    ("elixir", ROI_HOME_ELIXIR_BAR, ROI_HOME_ELIXIR, "elixir_cap"),
+    ("de", ROI_HOME_DE_BAR, ROI_HOME_DE, "de_cap"),
+)
+
+
+def storage_checks(settings: Settings) -> list[tuple[str, str]]:
+    """(resource, "bar" | "cap") for every resource whose fullness the bot can check.
+
+    A calibrated bar ROI wins (no capacity needed); otherwise a cap > 0 uses the OCR'd counter.
+    """
+    rois = settings.calibration.rois
+    checks = []
+    for resource, bar_roi, _counter_roi, cap_field in STORAGE_RESOURCES:
+        if bar_roi in rois:
+            checks.append((resource, "bar"))
+        elif getattr(settings.storage, cap_field) > 0:
+            checks.append((resource, "cap"))
+    return checks
+
+
 def used_slots(settings: Settings) -> tuple[int, ...]:
     """Every card slot the army uses: troops, heroes, siege and spells."""
     d = settings.deploy
@@ -104,10 +132,10 @@ def missing_calibration(settings: Settings, template_names: set[str]) -> list[st
         required_rois = (ROI_DE,) if settings.loot.min_de > 0 else ()
     else:
         required_rois = REQUIRED_ROIS + ((ROI_DE,) if settings.loot.min_de > 0 else ())
-    storage = settings.storage
-    caps = ((ROI_HOME_GOLD, storage.gold_cap), (ROI_HOME_ELIXIR, storage.elixir_cap),
-            (ROI_HOME_DE, storage.de_cap))
-    required_rois = required_rois + tuple(name for name, cap in caps if cap > 0)
+    required_rois = required_rois + tuple(
+        counter_roi for _res, bar_roi, counter_roi, cap_field in STORAGE_RESOURCES
+        if getattr(settings.storage, cap_field) > 0 and bar_roi not in cal.rois
+    )
     missing += [f"roi:{n}" for n in required_rois if n not in cal.rois]
     missing += [
         f"point:{n}" for n in required_points(

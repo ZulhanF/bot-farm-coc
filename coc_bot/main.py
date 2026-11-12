@@ -19,6 +19,7 @@ from coc_bot.config import Box, Settings, load_calibration, load_settings, save_
 from coc_bot.device.adb import AdbError, EmulatorAdb, find_adb
 from coc_bot.game.actions import Game
 from coc_bot.logs import setup_logging
+from coc_bot.vision.bars import BAR_HUES, bar_fill
 from coc_bot.vision.ocr import OcrReader, rapidocr_engine
 from coc_bot.vision.screens import detect_screen
 from coc_bot.vision.templates import TemplateLibrary
@@ -135,7 +136,12 @@ def cmd_test_vision(args: argparse.Namespace, settings: Settings) -> int:
     rois = settings.calibration.rois
     if rois:
         reader = OcrReader(rapidocr_engine())
+        bars = {bar_roi: res for res, bar_roi, _counter, _cap in N.STORAGE_RESOURCES}
         for name, roi in rois.items():
+            if name in bars:
+                fill = bar_fill(image, roi, BAR_HUES[bars[name]])
+                print(f"  BAR {name:<8} = {'?' if fill is None else f'{fill:.0%} full'}")
+                continue
             limit = N.ROI_LIMITS.get(name, N.MAX_GOLD)
             print(f"  OCR {name:<8} = {reader.read_number(image, roi, limit)}")
     return 0

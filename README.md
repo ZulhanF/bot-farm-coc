@@ -48,8 +48,8 @@
   `v_bottom`, `all`), plus siege machine and heroes with automatic ability activation.
 - **Spells** — drops spells such as Rage in rows like the troops, shifted forward in front of them,
   a few seconds after they land, to push them past 50 % faster.
-- **Storage-full check** — reads your own Gold / Elixir before each attack and stops (or waits) when your
-  storages are full, so no loot goes to waste.
+- **Storage-full check** — measures your Gold / Elixir / Dark Elixir bars before each attack and stops
+  (or waits) when they are full, so no loot goes to waste. No storage capacity to configure.
 - **Self-recovery** — detects popups, stuck screens and lost connections; escalates from *Back* to a full
   game restart, with a no-progress watchdog so a long unattended run never hangs silently.
 - **Human-like timing** — random tap jitter and delays, optional play/break sessions with daily hour caps.
@@ -130,7 +130,8 @@ on a live screenshot: drag a box, press **Enter** to save, **C** to cancel.
 | `template` (required) | `home_attack`, `btn_find_match`, `btn_attack`, `btn_next`, `btn_end_battle`, `btn_return_home`, `popup_okay` | the screen where each button is visible |
 | `template` (optional) | `btn_surrender`, `searching`, `army_close`, `popup_reload`, `popup_try_again`, `popup_close` | as they appear |
 | `roi` | `gold`, `elixir`, `de` | enemy base preview — only the loot digits, no icon |
-| `roi` | `home_gold`, `home_elixir`, `home_de` | your village, top-right resource counters |
+| `roi` | `home_gold_bar`, `home_elixir_bar`, `home_de_bar` | your village, top-right resource **bars** — the coloured bar from its left end to just before the icon |
+| `roi` | `home_gold`, `home_elixir`, `home_de` | *(optional fallback)* the counters' digits, used with `[storage]` caps |
 | `point` | `map_11`, `map_9`, `map_1`, `map_3` | edges of the battlefield for the deploy lines |
 | `point` | `troop_slot_N` | each troop / siege / hero / spell card in the bottom bar |
 | `point` | `map_center` | middle of the enemy base — spells aim from the deploy line towards it |
@@ -157,7 +158,7 @@ Calibration data is written to `calibration.toml` by the `calibrate` command.
 | `[deploy]` | `pattern`, `points_per_side`, `taps_per_point`, `troop_slots`, `siege_slot`, `hero_slots` |
 | `[spells]` | `slots`, `casts` (split over the troop rows), `delay_s`, `depth` — `0` on the troop line, `1` at `map_center` |
 | `[timing]` | `battle_timeout_s`, `damage_stagnant_s`, `tap_delay_ms`, `tap_jitter_px`, `progress_timeout_s` |
-| `[storage]` | `gold_cap`, `elixir_cap`, `de_cap`, `full_ratio`, `on_full` (`"stop"` / `"wait"`) |
+| `[storage]` | `full_ratio`, `on_full` (`"stop"` / `"wait"`), `wait_minutes`; optional `gold_cap` / `elixir_cap` / `de_cap` |
 | `[session]` | `enabled`, `play_minutes`, `break_minutes`, `active_hours`, `max_hours_per_day` |
 
 Example for quick win farming with a storage check:
@@ -174,9 +175,8 @@ casts = 4                # two Rages along each row
 delay_s = 5.0
 depth = 0.35             # just in front of the dragons
 
-[storage]
-gold_cap = 24000000      # your storage capacity
-elixir_cap = 24000000
+[storage]                # with home_*_bar calibrated, no capacity is needed
+full_ratio = 0.95
 on_full = "stop"
 
 [session]
@@ -249,7 +249,8 @@ Design notes and the original implementation plan are in [`docs/superpowers/`](d
 | `ADB error … timed out` / `device offline` | Usually the emulator is short on RAM/CPU during the battle → village transition. Give LDPlayer more resources and close other tools that run their own `adb` (Android Studio, scrcpy, other emulators). |
 | Loot always reads `0` or a wrong number | Recalibrate the `gold` / `elixir` ROI tightly around the digits only, then confirm with `test-vision`. |
 | A button is never found | Recalibrate that template; check its score in `test-vision` (it should be ≥ 0.85 on its own screen). |
-| Bot stops with `Storage full` | Expected when `[storage]` caps are set — spend resources, or use `on_full = "wait"`. |
+| Bot stops with `Storage full` | Expected — spend resources, or use `on_full = "wait"`. The log line shows each storage's level. |
+| Log says `Storage check is OFF` | Calibrate the `home_*_bar` ROIs; check them with `test-vision` (it prints `BAR … % full`). |
 
 ---
 

@@ -113,9 +113,9 @@ class FakeGame:
         self.calls.append("read_loot")
         return self.loot
 
-    def read_storage(self):
-        self.calls.append("read_storage")
-        return getattr(self, "storage", None)
+    def storage_levels(self):
+        self.calls.append("storage_levels")
+        return getattr(self, "levels", {})
 
     def read_damage_percent(self):
         return getattr(self, "damage_percent", None)

@@ -65,3 +65,14 @@ def test_spells_require_center_and_card_points():
     assert missing == ["point:map_center", "point:troop_slot_6"]
     assert N.used_slots(settings) == (1, 6)
     assert "map_center" in N.valid_names("point", (1,))
+
+
+def test_storage_checks_prefer_bar_over_cap():
+    from dataclasses import replace
+    cal = full_calibration().with_entry("rois", "home_gold_bar", (1000, 30, 230, 24))
+    settings = Settings(calibration=cal)
+    settings = replace(settings, storage=replace(settings.storage, gold_cap=1000, elixir_cap=1000))
+    assert N.storage_checks(settings) == [("gold", "bar"), ("elixir", "cap")]
+    missing = N.missing_calibration(settings, set(N.REQUIRED_TEMPLATES))
+    assert "roi:home_gold" not in missing      # bar replaces the counter
+    assert "roi:home_elixir" in missing

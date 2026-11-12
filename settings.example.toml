@@ -47,12 +47,13 @@ active_hours = ["08:00", "23:00"]
 max_hours_per_day = 10.0
 
 [storage]
-# Storage-full check on the home village. Set your storage capacity (as shown in-game)
-# and calibrate roi home_gold / home_elixir / home_de. 0 = don't check that resource.
+# Storage-full check on the home village, before every attack. Easiest: calibrate the coloured bars
+# (roi home_gold_bar / home_elixir_bar / home_de_bar, without the icon) - no capacity needed.
+# Fallback per resource: set its cap and calibrate the counter (roi home_gold / ...). 0 = no cap.
 gold_cap = 0
 elixir_cap = 0
 de_cap = 0
-full_ratio = 0.95        # full when amount >= cap * full_ratio (all checked resources)
+full_ratio = 0.95        # full when every checked storage is at least this full
 on_full = "stop"         # "stop" = end the run, "wait" = sleep wait_minutes, then check again
 wait_minutes = 30
 

@@ -131,25 +131,55 @@ def with_rois(**rois):
     return replace(s, calibration=replace(s.calibration, rois={**s.calibration.rois, **rois}))
 
 
-def test_read_storage_uncalibrated_returns_none():
+GOLD_BAR, ELIXIR_BAR = (1000, 30, 230, 24), (1000, 80, 230, 24)
+
+
+def bar_screen(gold_fill, elixir_fill):
+    """1280x720 frame with flat gold / elixir bars filled from the right."""
+    import cv2
+    import numpy as np
+    from coc_bot.vision.bars import BAR_HUES
+    hsv = np.zeros((720, 1280, 3), np.uint8)
+    hsv[..., 0], hsv[..., 1], hsv[..., 2] = 110, 60, 80
+    for (x, y, w, h), fill, hue in ((GOLD_BAR, gold_fill, BAR_HUES["gold"]),
+                                    (ELIXIR_BAR, elixir_fill, BAR_HUES["elixir"])):
+        n = int(round(w * fill))
+        hsv[y:y + h, x + w - n:x + w] = (hue, 200, 220)
+    return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+
+
+def test_storage_levels_empty_when_nothing_configured():
     game, _ = make_game()
-    assert game.read_storage() is None
+    assert game.storage_levels() == {}
 
 
-def test_read_storage_reads_home_counters():
-    HG, HE = (900, 20, 150, 25), (900, 60, 150, 25)
-    game, _ = make_game(ocr={HG: 5_000_000, HE: 4_000_000},
-                        settings=with_rois(home_gold=HG, home_elixir=HE))
+def test_storage_levels_from_bars_need_no_capacity():
+    game, adb = make_game(settings=with_rois(home_gold_bar=GOLD_BAR, home_elixir_bar=ELIXIR_BAR))
+    adb.image = bar_screen(1.0, 0.5)
     game.capture()
-    assert game.read_storage() == Loot(5_000_000, 4_000_000, 0)
+    levels = game.storage_levels()
+    assert set(levels) == {"gold", "elixir"}
+    assert levels["gold"] >= 0.97 and abs(levels["elixir"] - 0.5) < 0.04
 
 
-def test_read_storage_unreadable_counter_returns_none():
-    HG, HE = (900, 20, 150, 25), (900, 60, 150, 25)
-    game, _ = make_game(ocr={HG: 5_000_000}, settings=with_rois(home_gold=HG, home_elixir=HE))
+def test_storage_levels_from_counter_and_cap():
+    HG = (900, 20, 150, 25)
+    s = with_rois(home_gold=HG)
+    s = replace(s, storage=replace(s.storage, gold_cap=10_000_000))
+    game, _ = make_game(ocr={HG: 9_000_000}, settings=s)
     game.capture()
-    assert game.read_storage() is None
+    assert game.storage_levels() == {"gold": 0.9}
 
+
+def test_bar_wins_over_cap_and_unreadable_counter_is_none():
+    HE = (900, 60, 150, 25)
+    s = with_rois(home_gold_bar=GOLD_BAR, home_elixir=HE)
+    s = replace(s, storage=replace(s.storage, gold_cap=10_000_000, elixir_cap=10_000_000))
+    game, adb = make_game(ocr={}, settings=s)
+    adb.image = bar_screen(1.0, 0.0)
+    game.capture()
+    levels = game.storage_levels()
+    assert levels["gold"] >= 0.97 and levels["elixir"] is None
 
 
 def spell_game(depth=0.5, casts=2, center=(640, 360)):

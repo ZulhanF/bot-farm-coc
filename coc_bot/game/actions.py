@@ -15,6 +15,7 @@ from coc_bot import names as N
 from coc_bot.config import Point, Settings
 from coc_bot.game.deploy import edge_points, line_points
 from coc_bot.game.loot import Loot
+from coc_bot.vision.bars import BAR_HUES, bar_fill
 from coc_bot.vision.screens import Screen, detect_screen
 
 log = logging.getLogger(__name__)
@@ -131,27 +132,25 @@ class Game:
             de = 0
         return Loot(gold, elixir, de)
 
-    def _read_resources(self, names: tuple[str, str, str]) -> Loot | None:
-        """OCR three counters from the current frame; uncalibrated ones read as 0."""
-        rois = self.settings.calibration.rois
-        if not any(name in rois for name in names):
-            return None
-        image = self._image(fresh=False)
-        values = []
-        for name in names:
-            if name not in rois:
-                values.append(0)
-                continue
-            value = self.ocr.read_number(image, rois[name], N.ROI_LIMITS[name])
-            if value is None:
-                log.warning("Could not read %s", name)
-                return None
-            values.append(value)
-        return Loot(*values)
+    def storage_levels(self) -> dict[str, float | None]:
+        """How full each checked storage is (0..1), from its bar or from counter / cap.
 
-    def read_storage(self) -> Loot | None:
-        """Own gold/elixir/DE on the home village."""
-        return self._read_resources(N.HOME_ROIS)
+        Empty dict = no storage check configured. None = that resource could not be read.
+        """
+        checks = N.storage_checks(self.settings)
+        if not checks:
+            return {}
+        image = self._image(fresh=False)
+        rois = self.settings.calibration.rois
+        levels: dict[str, float | None] = {}
+        for resource, bar_roi, counter_roi, cap_field in N.STORAGE_RESOURCES:
+            method = dict(checks).get(resource)
+            if method == "bar":
+                levels[resource] = bar_fill(image, rois[bar_roi], BAR_HUES[resource])
+            elif method == "cap":
+                amount = self.ocr.read_number(image, rois[counter_roi], N.ROI_LIMITS[counter_roi])
+                levels[resource] = None if amount is None else amount / getattr(self.settings.storage, cap_field)
+        return levels
 
     def deploy_army(self) -> None:
         d = self.settings.deploy

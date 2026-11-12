@@ -255,40 +255,47 @@ def with_storage(**kw):
     return replace(s, storage=replace(s.storage, **kw))
 
 
-def test_storage_not_read_when_no_caps():
+def test_storage_check_off_attacks():
     game = FakeGame([Screen.HOME])
     make_bot(game)[0].tick()
-    assert game.count("read_storage") == 0
     assert game.count("open_attack_menu") == 1
 
 
 def test_full_storage_stops_bot():
     game = FakeGame([Screen.HOME])
-    game.storage = Loot(1000, 1000, 0)
-    bot, _ = make_bot(game, settings=with_storage(gold_cap=1000, elixir_cap=1000))
+    game.levels = {"gold": 1.0, "elixir": 0.97, "de": 0.99}
+    bot, _ = make_bot(game)
     bot.run(max_ticks=5)
-    assert game.count("read_storage") == 1
+    assert game.count("storage_levels") == 1
     assert game.count("open_attack_menu") == 0
 
 
 def test_full_storage_wait_mode_sleeps_then_rechecks():
     game = FakeGame([Screen.HOME])
-    game.storage = Loot(1000, 1000, 0)
-    bot, clock = make_bot(game, settings=with_storage(gold_cap=1000, elixir_cap=1000,
-                                                      on_full="wait", wait_minutes=30))
+    game.levels = {"gold": 1.0, "elixir": 1.0}
+    bot, clock = make_bot(game, settings=with_storage(on_full="wait", wait_minutes=30))
     bot.tick()
     assert clock.slept == [1800]
-    game.storage = Loot(10, 10, 0)
+    game.levels = {"gold": 0.2, "elixir": 0.3}
     bot.tick()
     assert game.count("open_attack_menu") == 1
 
 
 def test_not_full_storage_attacks():
     game = FakeGame([Screen.HOME])
-    game.storage = Loot(500, 1000, 0)
-    bot, _ = make_bot(game, settings=with_storage(gold_cap=1000, elixir_cap=1000))
+    game.levels = {"gold": 1.0, "elixir": 0.5}
+    bot, _ = make_bot(game)
     bot.tick()
     assert game.count("open_attack_menu") == 1
+
+
+def test_startup_warns_when_storage_check_is_off(caplog):
+    game = FakeGame([Screen.HOME])
+    bot, _ = make_bot(game)
+    bot.stop()
+    with caplog.at_level("WARNING"):
+        bot.run()
+    assert "Storage check is OFF" in caplog.text
 
 
 def test_attack_recorded_once_with_cycle():

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from coc_bot.config import LootConfig, StorageConfig
+from coc_bot.config import LootConfig
 
 
 @dataclass(frozen=True)
@@ -20,13 +20,8 @@ def is_worth_attacking(loot: Loot | None, cfg: LootConfig) -> bool:
     return loot.gold >= cfg.min_gold and loot.elixir >= cfg.min_elixir and loot.de >= cfg.min_de
 
 
-def storage_full(storage: Loot | None, cfg: StorageConfig) -> bool:
-    """True when every resource that has a cap configured is at least full_ratio full."""
-    checks = [(amount, cap) for amount, cap in
-              ((storage.gold if storage else 0, cfg.gold_cap),
-               (storage.elixir if storage else 0, cfg.elixir_cap),
-               (storage.de if storage else 0, cfg.de_cap))
-              if cap > 0]
-    if storage is None or not checks:
+def storage_full(levels: dict[str, float | None], full_ratio: float) -> bool:
+    """True when every checked resource is at least full_ratio full (unreadable = not full)."""
+    if not levels:
         return False
-    return all(amount >= cap * cfg.full_ratio for amount, cap in checks)
+    return all(level is not None and level >= full_ratio for level in levels.values())

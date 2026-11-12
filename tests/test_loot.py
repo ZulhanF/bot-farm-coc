@@ -23,22 +23,17 @@ def test_none_is_not_worth():
     assert not is_worth_attacking(None, CFG)
 
 
-from coc_bot.config import StorageConfig
 from coc_bot.game.loot import storage_full
 
-STORE = StorageConfig(gold_cap=1000, elixir_cap=2000, de_cap=0, full_ratio=0.9)
+
+def test_storage_full_needs_every_checked_resource():
+    assert storage_full({"gold": 0.96, "elixir": 0.95}, 0.95)
+    assert not storage_full({"gold": 0.96, "elixir": 0.94}, 0.95)
 
 
-def test_storage_full_needs_every_capped_resource():
-    assert storage_full(Loot(900, 1800, 0), STORE)
-    assert not storage_full(Loot(900, 1799, 0), STORE)
-    assert not storage_full(Loot(899, 2000, 0), STORE)
+def test_unreadable_level_is_not_full():
+    assert not storage_full({"gold": 1.0, "elixir": None}, 0.95)
 
 
-def test_storage_uncapped_resource_ignored():
-    assert storage_full(Loot(1000, 2000, 0), STORE)  # DE has no cap
-
-
-def test_storage_not_checked_without_caps_or_reading():
-    assert not storage_full(Loot(10**9, 10**9, 10**9), StorageConfig())
-    assert not storage_full(None, STORE)
+def test_no_checks_is_never_full():
+    assert not storage_full({}, 0.95)

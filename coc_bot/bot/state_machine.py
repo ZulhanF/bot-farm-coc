@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable
 
+from coc_bot import names as N
 from coc_bot.config import Settings
 from coc_bot.device.adb import AdbError
 from coc_bot.game.loot import Loot, is_worth_attacking, storage_full
@@ -104,6 +105,7 @@ class Bot:
         self.policy.start_play(self.clock())
         self._last_progress = self.clock()
         self._started_at = self.clock()
+        self._log_storage_check()
         adb_failures = 0
         ticks = 0
         try:
@@ -335,19 +337,31 @@ class Bot:
     # --- storage / records --------------------------------------------------
     def _storage_is_full(self, now: datetime) -> bool:
         cfg = self.settings.storage
-        if not (cfg.gold_cap or cfg.elixir_cap or cfg.de_cap):
+        levels = self.game.storage_levels()
+        if not levels:
             return False
-        storage = self.game.read_storage()
-        if not storage_full(storage, cfg):
+        summary = ", ".join(f"{res} {'?' if lvl is None else f'{lvl:.0%}'}" for res, lvl in levels.items())
+        if not storage_full(levels, cfg.full_ratio):
+            log.info("Storage: %s", summary)
             return False
         if cfg.on_full == "wait":
-            log.info("Storage full (%s), waiting %d min", storage, cfg.wait_minutes)
+            log.info("Storage full (%s), waiting %d min", summary, cfg.wait_minutes)
             self.sleep(cfg.wait_minutes * 60)
             self._mark_progress()
             return True
-        log.info("Storage full (%s), stopping the bot", storage)
+        log.info("Storage full (%s), stopping the bot", summary)
         self.stop()
         return True
+
+    def _log_storage_check(self) -> None:
+        checks = N.storage_checks(self.settings)
+        if checks:
+            log.info("Storage check on: %s (stop when all >= %.0f%%)",
+                     ", ".join(f"{res} ({method})" for res, method in checks),
+                     self.settings.storage.full_ratio * 100)
+        else:
+            log.warning("Storage check is OFF: calibrate roi home_gold_bar / home_elixir_bar / "
+                        "home_de_bar (or set [storage] caps) to stop when storages are full")
 
     def _record_attack(self, now: datetime) -> None:
         started = self._attack_started
