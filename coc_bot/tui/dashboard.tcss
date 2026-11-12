@@ -1,0 +1,225 @@
+Screen {
+    background: $background;
+}
+
+#statusbar {
+    dock: top;
+    height: 1;
+    background: $panel;
+    color: $foreground;
+}
+
+#body {
+    height: 1fr;
+}
+
+/* --- sidebar --- */
+#sidebar {
+    width: 22;
+    background: $surface;
+    border-right: tall $panel;
+    padding: 1 0 0 0;
+}
+
+#brand {
+    padding: 0 2 1 2;
+}
+
+#nav {
+    height: auto;
+    border: none;
+    background: $surface;
+    padding: 0;
+}
+
+#nav:focus {
+    border: none;
+}
+
+#nav > .option-list--option-highlighted {
+    background: $primary 25%;
+    color: $text;
+    text-style: bold;
+}
+
+#sidebar-mode {
+    dock: bottom;
+    padding: 1 2;
+    color: $text-muted;
+}
+
+/* --- pages --- */
+#pages {
+    height: 1fr;
+    padding: 0 1;
+}
+
+Page {
+    height: 1fr;
+}
+
+.panel {
+    border: round $panel;
+    border-title-color: $primary;
+    border-title-style: bold;
+    padding: 0 1;
+    background: $background;
+}
+
+.panel:focus, .panel:focus-within {
+    border: round $primary 70%;
+}
+
+.hint {
+    color: $text-muted;
+    padding: 1 1 0 1;
+    height: auto;
+}
+
+/* home */
+#logo {
+    padding: 1 2 0 2;
+    height: auto;
+}
+
+#tagline {
+    padding: 0 1 1 1;
+    height: auto;
+}
+
+#home-row {
+    height: auto;
+}
+
+#sysinfo {
+    width: 1fr;
+    height: auto;
+    min-height: 12;
+}
+
+#quickstart {
+    width: 46;
+    height: auto;
+}
+
+/* bot */
+#bot-top {
+    height: auto;
+}
+
+#bot-status {
+    width: 1fr;
+    height: auto;
+    min-height: 10;
+}
+
+#bot-buttons {
+    width: 24;
+    height: auto;
+}
+
+#bot-buttons Button {
+    width: 100%;
+    margin: 0 0 1 0;
+}
+
+#bot-log {
+    height: 1fr;
+}
+
+/* mode */
+#mode-list {
+    height: auto;
+    margin-top: 1;
+}
+
+/* calibration */
+#cal-summary {
+    padding: 1 1 0 1;
+    height: auto;
+}
+
+#cal-table {
+    height: 1fr;
+}
+
+/* settings */
+#settings-editor {
+    height: 1fr;
+}
+
+#settings-buttons {
+    height: auto;
+    padding: 0 1;
+}
+
+#settings-buttons Button {
+    margin-right: 2;
+}
+
+/* logs */
+#file-log {
+    height: 1fr;
+    margin-top: 1;
+}
+
+/* stats */
+#stats-row {
+    height: auto;
+    margin-top: 1;
+}
+
+#stats-today, #stats-all {
+    width: 1fr;
+    height: auto;
+    min-height: 7;
+}
+
+#stats-spark-box {
+    height: auto;
+}
+
+#stats-spark {
+    height: 4;
+    width: 48;
+}
+
+#stats-spark > .sparkline--max-color {
+    color: $primary;
+}
+
+#stats-spark > .sparkline--min-color {
+    color: $secondary 60%;
+}
+
+#stats-hours {
+    width: 48;
+}
+
+#stats-table {
+    height: 1fr;
+}
+
+/* vision */
+#vision-buttons {
+    height: auto;
+    padding: 1 1 0 1;
+}
+
+#vision-buttons Button {
+    margin-right: 2;
+}
+
+#vision-screen {
+    padding: 1 1 0 1;
+    height: auto;
+}
+
+#vision-row {
+    height: 1fr;
+}
+
+#vision-templates, #vision-rois {
+    width: 1fr;
+    height: 1fr;
+}

@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import random
-import time
 from datetime import datetime
 from pathlib import Path
 
@@ -12,20 +10,14 @@ import cv2
 import numpy as np
 
 from coc_bot import names as N
-from coc_bot.bot.records import CsvRecorder
-from coc_bot.bot.session import SessionPolicy
-from coc_bot.bot.state_machine import Bot, FatalError
 from coc_bot.config import Box, Settings, load_calibration, load_settings, save_calibration
-from coc_bot.device.adb import AdbError, EmulatorAdb, find_adb
-from coc_bot.game.actions import Game
+from coc_bot.control import BotRunner, Mode, Paths, connect, load_templates
+from coc_bot.device.adb import AdbError
 from coc_bot.logs import setup_logging
-from coc_bot.vision.bars import BAR_HUES, bar_fill
-from coc_bot.vision.ocr import OcrReader, rapidocr_engine
-from coc_bot.vision.screens import detect_screen
+from coc_bot.vision.report import analyse
 from coc_bot.vision.templates import TemplateLibrary
 
 log = logging.getLogger("coc_bot")
-EXPECTED_SHAPE = (720, 1280)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -33,8 +25,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--settings", type=Path, default=Path("settings.toml"))
     parser.add_argument("--calibration", type=Path, default=Path("calibration.toml"))
     parser.add_argument("--templates", type=Path, default=Path("assets/templates"))
-    sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("run", help="run the bot (Ctrl+C to stop)")
+    sub = parser.add_subparsers(dest="command")
+    sub.add_parser("dashboard", help="open the terminal dashboard (default without a command)")
+    run = sub.add_parser("run", help="run the bot (Ctrl+C to stop)")
+    run.add_argument("--mode", choices=[m.value for m in Mode], default=Mode.HOME.value)
     sub.add_parser("check", help="list missing calibration items")
     shot = sub.add_parser("screenshot", help="save an emulator screenshot")
     shot.add_argument("--out", type=Path)
@@ -47,15 +41,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _paths(args: argparse.Namespace) -> Paths:
+    return Paths(args.settings, args.calibration, args.templates)
+
+
 def _templates(args: argparse.Namespace, settings: Settings) -> TemplateLibrary:
-    return TemplateLibrary.load(args.templates, settings.calibration.templates,
-                                settings.vision.threshold, settings.vision.search_margin_px)
+    return load_templates(_paths(args), settings)
 
 
-def _connect(settings: Settings) -> EmulatorAdb:
-    adb = EmulatorAdb(find_adb(settings.adb.adb_path), settings.adb.serial)
-    adb.connect()
-    return adb
+def _connect(settings: Settings):
+    return connect(settings)
 
 
 def _read_image(path: Path) -> np.ndarray | None:
@@ -124,67 +119,42 @@ def cmd_test_vision(args: argparse.Namespace, settings: Settings) -> int:
     image = _read_image(args.image)
     if image is None:
         return 2
-    templates = _templates(args, settings)
-    print(f"Screen: {detect_screen(image, templates).name}")
-    for name in templates.names():
-        match = templates.find(image, name, threshold=-1.0)
-        if match is None:
-            print(f"  {name:<18} (does not fit)")
-            continue
-        status = "MATCH" if match.score >= settings.vision.threshold else "-"
-        print(f"  {name:<18} score={match.score:.3f} at {match.center} {status}")
-    rois = settings.calibration.rois
-    if rois:
-        reader = OcrReader(rapidocr_engine())
-        bars = {bar_roi: res for res, bar_roi, _counter, _cap in N.STORAGE_RESOURCES}
-        for name, roi in rois.items():
-            if name in bars:
-                fill = bar_fill(image, roi, BAR_HUES[bars[name]])
-                print(f"  BAR {name:<8} = {'?' if fill is None else f'{fill:.0%} full'}")
-                continue
-            limit = N.ROI_LIMITS.get(name, N.MAX_GOLD)
-            print(f"  OCR {name:<8} = {reader.read_number(image, roi, limit)}")
+    report = analyse(image, settings, _templates(args, settings))
+    print(f"Screen: {report.screen}")
+    for t in report.templates:
+        if t.score is None:
+            print(f"  {t.name:<18} (does not fit)")
+        else:
+            print(f"  {t.name:<18} score={t.score:.3f} at {t.center} {'MATCH' if t.match else '-'}")
+    for r in report.rois:
+        if r.kind == "bar":
+            print(f"  BAR {r.name:<8} = {'?' if r.value is None else f'{r.value:.0%} full'}")
+        else:
+            print(f"  OCR {r.name:<8} = {r.value}")
     return 0
 
 
 def cmd_run(args: argparse.Namespace, settings: Settings) -> int:
-    templates = _templates(args, settings)
-    missing = N.missing_calibration(settings, set(templates.names()))
+    missing = N.missing_calibration(settings, set(_templates(args, settings).names()))
     if missing:
         print("Calibration incomplete, run `python -m coc_bot check`. Missing:", ", ".join(missing))
         return 2
     log_path = setup_logging(Path("logs"))
     log.info("Logging to %s", log_path)
-    game = bot = None
-    try:
-        adb = _connect(settings)
-        shape = adb.screencap().shape[:2]
-        if shape != EXPECTED_SHAPE:
-            log.error("Emulator resolution must be 1280x720, got %dx%d", shape[1], shape[0])
-            return 2
-        rng = random.Random()
-        game = Game(adb, templates, OcrReader(rapidocr_engine()), settings, rng)
-        bot = Bot(game, SessionPolicy(settings.session, rng), settings, rng,
-                  clock=datetime.now, sleep=time.sleep, recorder=CsvRecorder(Path("logs")))
-        bot.run()
-    except KeyboardInterrupt:
-        log.info("Stopped by user (Ctrl+C).%s", f" {bot.stats}" if bot else "")
-    except FatalError as exc:
-        if game is not None:
-            game.save_debug_screenshot("fatal")
-        log.error("Fatal: %s.%s", exc, f" {bot.stats}" if bot else "")
-        return 1
-    except AdbError:
-        raise
-    except Exception:
-        log.exception("Unexpected error.%s", f" {bot.stats}" if bot else "")
-        if game is not None:
-            game.save_debug_screenshot("crash")
-        return 1
-    return 0
+    runner = BotRunner(_paths(args), Mode(getattr(args, "mode", Mode.HOME.value)))
+    code = runner.run()
+    if code == 3:
+        raise AdbError(runner.status().error or "ADB error")
+    return code
+
+
+def cmd_dashboard(args: argparse.Namespace, settings: Settings) -> int:
+    from coc_bot.tui.app import run_dashboard   # Textual is only needed for the dashboard
+    return run_dashboard(_paths(args))
 
 
 COMMANDS = {
+    "dashboard": cmd_dashboard,
     "run": cmd_run,
     "check": cmd_check,
     "screenshot": cmd_screenshot,
@@ -195,6 +165,8 @@ COMMANDS = {
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command is None:
+        args.command = "dashboard"
     try:
         settings = load_settings(args.settings, args.calibration)
     except ValueError as exc:

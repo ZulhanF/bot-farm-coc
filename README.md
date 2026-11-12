@@ -32,6 +32,7 @@
 - [Installation](#installation)
 - [Calibration](#calibration)
 - [Configuration](#configuration)
+- [Dashboard](#dashboard)
 - [Usage](#usage)
 - [Logs and statistics](#logs-and-statistics)
 - [Project structure](#project-structure)
@@ -40,6 +41,8 @@
 
 ## Features
 
+- **Terminal dashboard** — `python -m coc_bot` opens an interactive TUI: system info at a glance,
+  start / pause / stop with a live log, calibration checklist, settings editor, statistics and a vision test.
 - **Fast win farming** — attacks, waits until **50 % destruction** (one star = win and league bonus),
   then surrenders early to start the next battle. Built for the *Clash Anytime* era with no training time.
 - **Loot filter** — reads the enemy's available Gold / Elixir / Dark Elixir with OCR and skips bases below
@@ -186,11 +189,35 @@ enabled = true           # breaks and daily caps make the bot look less like a b
 > [!IMPORTANT]
 > Running 24/7 with `session.enabled = false` is the easiest pattern for anti-bot systems to spot.
 
+## Dashboard
+
+```powershell
+.venv\Scripts\python -m coc_bot
+```
+
+Opens the terminal dashboard (built with [Textual](https://textual.textualize.io/)). Use a terminal at
+least 120 columns wide, such as Windows Terminal.
+
+| Key | Page | What you get |
+|---|---|---|
+| `1` | Beranda | Neofetch-style overview: emulator online, resolution, calibration, storage bars, deploy / spell / loot / session settings |
+| `2` | Bot | Start, pause / resume, stop; live status (screen, attacks, recoveries) and live log |
+| `3` | Mode | What to run when started — `home` today; `builder`, `walls`, `auto` are planned |
+| `4` | Kalibrasi | Every template / ROI / point with ✓ / ✗; **Enter** opens the calibration window for that item |
+| `5` | Pengaturan | Edit `settings.toml`; **Ctrl+S** validates before saving |
+| `6` | Log | Today's log file, coloured by level |
+| `7` | Statistik | Attacks, wins ≥ 50 %, average cycle / battle / damage, attacks per hour chart, recent attacks |
+| `8` | Tes vision | Screenshot the emulator and show the detected screen, template scores, bars and OCR |
+
+`S` starts or stops the bot from any page, `P` pauses, `R` refreshes, `Q` stops the bot and quits.
+`Ctrl+P` opens the command palette (for example to change the colour theme).
+
 ## Usage
 
 | Command | What it does |
 |---|---|
-| `python -m coc_bot run` | Start farming. **Ctrl+C** stops cleanly. |
+| `python -m coc_bot` | Open the terminal dashboard (same as `python -m coc_bot dashboard`). |
+| `python -m coc_bot run [--mode home]` | Start farming without the dashboard. **Ctrl+C** stops cleanly. |
 | `python -m coc_bot check` | List calibration items still missing for your settings. |
 | `python -m coc_bot screenshot [--out file.png]` | Save an emulator screenshot (default `tests/fixtures/`). |
 | `python -m coc_bot test-vision <image>` | Show detected screen, template scores and OCR results — no taps. |
@@ -214,6 +241,8 @@ coc_bot/
 ├── vision/
 │   ├── templates.py       template matching inside calibrated boxes
 │   ├── ocr.py             single-line RapidOCR number reader
+│   ├── bars.py            resource bar fill (storage-full check)
+│   ├── report.py          what the bot sees on one screenshot (test-vision)
 │   └── screens.py         which screen is showing
 ├── game/
 │   ├── actions.py         high-level actions (find match, deploy, surrender, …)
@@ -222,7 +251,10 @@ coc_bot/
 ├── bot/
 │   ├── state_machine.py   main loop, stuck detection, recovery
 │   ├── session.py         active hours, breaks, daily cap
-│   └── records.py         per-attack CSV log
+│   ├── records.py         per-attack CSV log
+│   └── stats_report.py    summaries of the CSV logs
+├── tui/                   terminal dashboard (Textual): app, pages, styles
+├── control.py             run / pause / stop the bot from outside its loop
 ├── config.py              settings.toml / calibration.toml loading
 ├── names.py               shared template / ROI / point names
 └── main.py                command-line interface

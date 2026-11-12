@@ -101,6 +101,17 @@ class Bot:
     def stop(self) -> None:
         self._stop = True
 
+    @property
+    def current_screen(self) -> Screen | None:
+        return self._last_screen
+
+    def reset_timers(self) -> None:
+        """After a pause: don't count the paused time as being stuck."""
+        self._mark_progress()
+        self._after_recovery()
+        if self._last_damage_time is not None:
+            self._last_damage_time = self.clock()
+
     def run(self, max_ticks: int | None = None) -> None:
         self.policy.start_play(self.clock())
         self._last_progress = self.clock()
