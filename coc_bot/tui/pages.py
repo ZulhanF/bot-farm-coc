@@ -115,6 +115,7 @@ class HomePage(Page):
             ("7", "Statistik", "serangan/jam, menang, siklus"),
             ("8", "Tes vision", "apa yang dilihat bot"),
             ("S", "Start/Stop", "dari halaman mana pun"),
+            ("C", "Cek storage", "on / off"),
             ("Q", "Keluar", ""),
         ):
             table.add_row(key, Text.assemble((label, "bold"), ("  " + hint, "dim")))
