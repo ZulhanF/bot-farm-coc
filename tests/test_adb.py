@@ -111,3 +111,9 @@ def test_find_adb_candidate_then_path():
 def test_find_adb_nothing_raises():
     with pytest.raises(AdbError):
         find_adb(candidates=(), exists=lambda p: False, which=lambda n: None)
+
+
+def test_swipe_args():
+    adb, runner = make()
+    adb.swipe(10, 20, 30, 40, 500)
+    assert runner.calls[0] == ["adb.exe", "-s", SERIAL, "shell", "input", "swipe", "10", "20", "30", "40", "500"]

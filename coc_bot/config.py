@@ -89,7 +89,7 @@ BB_MAX_SLOTS = 8
 class BuilderConfig:
     mode: str = "elixir"             # "elixir" = 1 troop + surrender, "gold" = hero + tank + Night Witch push
     cart_every: int = 15             # collect the Elixir Cart every N attacks (both modes)
-    troop_slot: int = 2              # elixir: the one card dropped before surrendering
+    troop_slot: int = 1              # elixir: the card dropped before surrendering (hero: no swap button)
     surrender_after_s: float = 1.5
     hero_slot: int = 1               # gold: hero card (pick Battle Copter in the army screen)
     tank_slot: int = 2               # gold: Giant; 0 = no tank

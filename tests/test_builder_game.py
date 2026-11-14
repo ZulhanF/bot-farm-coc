@@ -114,3 +114,52 @@ def test_collect_cart_without_window_backs_out():
     game, adb = make(visible={N.BB_ELIXIR_CART})
     assert game.collect_cart() is False
     assert ("back",) in adb.calls
+
+
+def test_boat_is_searched_anywhere():
+    class Recording(FakeTemplates):
+        def find(self, image, name, threshold=None, anywhere=False):
+            self.anywhere = anywhere
+            return super().find(image, name, threshold)
+    game, _ = make()
+    game.templates = Recording({N.BB_BOAT})
+    assert game.go_to_builder_base() is True
+    assert game.templates.anywhere is True
+
+
+def test_boat_not_visible_swipes_map_then_gives_up():
+    game, adb = make()
+    assert game.go_to_builder_base() is False
+    assert sum(1 for c in adb.calls if c[0] == "swipe") == 2
+
+
+def test_boat_found_without_swiping():
+    game, adb = make(visible={N.BB_BOAT})
+    assert game.go_to_builder_base() is True
+    assert not any(c[0] == "swipe" for c in adb.calls)
+
+
+def test_cart_is_searched_anywhere():
+    class Recording(FakeTemplates):
+        def find(self, image, name, threshold=None, anywhere=False, scales=(1.0,)):
+            if name == N.BB_ELIXIR_CART:
+                self.cart_anywhere = anywhere
+            return super().find(image, name, threshold)
+    game, _ = make()
+    game.templates = Recording({N.BB_ELIXIR_CART, N.BB_BTN_COLLECT})
+    assert game.collect_cart() is True
+    assert game.templates.cart_anywhere is True
+
+
+def test_cart_not_visible_swipes_towards_dock_then_gives_up():
+    game, adb = make()
+    assert game.collect_cart() is False
+    assert sum(1 for c in adb.calls if c[0] == "swipe") == 2
+
+
+def test_drop_waits_after_selecting_the_card():
+    slept = []
+    game, adb = make(troop_slot=2)
+    game.sleep = slept.append
+    game.drop_one_troop()
+    assert any(s >= 0.4 for s in slept)

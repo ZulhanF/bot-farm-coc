@@ -76,8 +76,9 @@ def test_elixir_battle_surrenders_again():
 def test_cart_collected_every_n_attacks():
     loop, game, task, _ = make([Screen.BB_HOME], cart_every=3)
     loop.tick()                       # first visit: collect
-    for _ in range(3):
-        task._on_prep(loop.clock())   # three attacks
+    for _ in range(3):                # three attacks, each ending on the result screen
+        task._on_prep(loop.clock())
+        task._on_result(loop.clock())
     loop.tick()
     assert game.count("collect_cart") == 2
     loop.tick()
@@ -202,3 +203,19 @@ def test_gold_battle_overrun_triggers_recovery():
     clock.sleep(10 + 121)
     loop.tick()
     assert game.count("go_back") == 1 and loop.stats.recoveries == 1
+
+
+def test_prep_seen_twice_counts_one_attack_and_retries_deploy():
+    loop, game, task, _ = make([Screen.BB_PREP])
+    loop.tick()
+    loop.tick()
+    assert loop.stats.attacks == 1
+    assert game.count("drop_one_troop") == 2
+
+
+def test_next_battle_counts_again_after_result():
+    loop, game, task, _ = make([Screen.BB_PREP, Screen.BB_RESULT, Screen.BB_PREP])
+    loop.tick()
+    loop.tick()
+    loop.tick()
+    assert loop.stats.attacks == 2

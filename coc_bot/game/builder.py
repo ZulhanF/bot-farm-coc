@@ -11,6 +11,13 @@ from coc_bot.vision.screens import Screen, detect_builder_screen
 log = logging.getLogger(__name__)
 
 DROP_SPREAD_PX = 12   # one deploy point, but not the same pixel every tap
+BOAT_SWIPES = 2       # drags towards the bottom-left shore when the boat is off screen
+SHORE_SWIPE = (600, 400, 900, 150)   # finger up-right = map moves up-right = bottom-left comes into view
+BOAT_THRESHOLD = 0.80  # the boat bubble sits on sand, sea or the event panel: looser than buttons
+CART_THRESHOLD = 0.72  # the cart looks different empty / full (bottles, bubble); nothing else scores > 0.4
+CART_SCALES = (1.0, 1.4)  # zoom when arriving by boat / the closer default zoom after a battle
+DOCK_SWIPE = (800, 200, 450, 500)  # finger down-left = map moves down-left = the dock (top-right) comes into view
+CARD_SELECT_S = 0.4   # a map tap right after selecting a card is ignored by the game
 
 
 class BuilderGame(Game):
@@ -31,6 +38,7 @@ class BuilderGame(Game):
             log.warning("Card bb_slot_%d is not calibrated, skipped", slot)
             return False
         self.tap(card)
+        self.sleep(CARD_SELECT_S)
         for _ in range(taps):
             self.tap(self._spread(target))
         return True
@@ -42,8 +50,18 @@ class BuilderGame(Game):
 
     # --- village / search -----------------------------------------------------
     def go_to_builder_base(self) -> bool:
-        if not self.tap_template(N.BB_BOAT):
+        # the boat moves with the camera: search the whole screen, drag the map towards it if needed
+        match = self.templates.find(self.capture(), N.BB_BOAT, BOAT_THRESHOLD, anywhere=True)
+        for _ in range(BOAT_SWIPES):
+            if match is not None:
+                break
+            log.info("Boat not on screen, dragging the map towards the shore")
+            self.adb.swipe(*SHORE_SWIPE, 600)
+            self.sleep(1.0)
+            match = self.templates.find(self.capture(), N.BB_BOAT, BOAT_THRESHOLD, anywhere=True)
+        if match is None:
             return False
+        self.tap(match.center)
         self.sleep(6.0)   # sailing + loading
         return True
 
@@ -110,9 +128,23 @@ class BuilderGame(Game):
         return self.tap_template(N.BB_BTN_RETURN_HOME, fresh=False)
 
     # --- Elixir Cart ------------------------------------------------------------
+    def _find_cart(self, fresh: bool):
+        return self.templates.find(self._image(fresh), N.BB_ELIXIR_CART, CART_THRESHOLD,
+                                   anywhere=True, scales=CART_SCALES)
+
     def collect_cart(self) -> bool:
-        if not self.tap_template(N.BB_ELIXIR_CART, fresh=False):
+        # the cart moves with the camera, changes with its fill level and its size follows the zoom
+        cart = self._find_cart(fresh=False)
+        for _ in range(BOAT_SWIPES):
+            if cart is not None:
+                break
+            log.info("Elixir Cart not on screen, dragging the map towards the dock")
+            self.adb.swipe(*DOCK_SWIPE, 600)
+            self.sleep(1.0)
+            cart = self._find_cart(fresh=True)
+        if cart is None:
             return False
+        self.tap(cart.center)
         if not self.wait_for(N.BB_BTN_COLLECT, timeout_s=3.0):
             self.go_back()
             return False

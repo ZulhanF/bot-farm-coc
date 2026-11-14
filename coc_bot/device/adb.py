@@ -81,6 +81,9 @@ class EmulatorAdb:
     def tap(self, x: int, y: int) -> None:
         self._cmd("shell", "input", "tap", str(int(x)), str(int(y)))
 
+    def swipe(self, x1: int, y1: int, x2: int, y2: int, ms: int = 500) -> None:
+        self._cmd("shell", "input", "swipe", str(int(x1)), str(int(y1)), str(int(x2)), str(int(y2)), str(int(ms)))
+
     def key_back(self) -> None:
         self._cmd("shell", "input", "keyevent", "4")
 

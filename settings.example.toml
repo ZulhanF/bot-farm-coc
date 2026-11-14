@@ -58,7 +58,7 @@ wait_minutes = 30
 mode = "elixir"          # "elixir" = drop 1 troop + surrender (elixir comes from defenses, trophies drop)
                          # "gold"   = hero + Giant + Night Witch at one point, stage 2 too
 cart_every = 15          # collect the Elixir Cart every N attacks
-troop_slot = 2           # elixir: card dropped before surrendering
+troop_slot = 1           # elixir: card dropped before surrendering (1 = hero, safest)
 surrender_after_s = 1.5
 hero_slot = 1            # gold: hero card (choose Battle Copter in the Builder Base army screen)
 tank_slot = 2            # gold: Giant (0 = no tank)

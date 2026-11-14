@@ -78,3 +78,25 @@ def test_names_sorted(tmp_path):
     save_template(tmp_path, "a", img, (20, 20, 10, 10))
     lib = TemplateLibrary.load(tmp_path, {}, threshold=0.85, margin=40)
     assert lib.names() == ["a", "b"]
+
+
+def test_anywhere_ignores_the_box(tmp_path):
+    img = noise(9)
+    save_template(tmp_path, "boat", img, (900, 100, 40, 40))
+    lib = TemplateLibrary.load(tmp_path, {"boat": (100, 500, 40, 40)}, threshold=0.85, margin=40)
+    assert lib.find(img, "boat") is None            # moved away from its calibrated box
+    m = lib.find(img, "boat", anywhere=True)
+    assert m is not None and (m.x, m.y) == (900, 100)
+
+
+def test_scales_find_a_larger_copy(tmp_path):
+    img = noise(11)
+    save_template(tmp_path, "cart", img, (300, 300, 40, 30))
+    big = img.copy()
+    patch = cv2.resize(img[300:330, 300:340], (56, 42), interpolation=cv2.INTER_LINEAR)
+    big[100:142, 900:956] = patch
+    big[300:330, 300:340] = 0
+    lib = TemplateLibrary.load(tmp_path, {}, threshold=0.85, margin=40)
+    assert lib.find(big, "cart") is None
+    m = lib.find(big, "cart", scales=(1.0, 1.4))
+    assert m is not None and abs(m.x - 900) <= 2 and (m.w, m.h) == (56, 42)

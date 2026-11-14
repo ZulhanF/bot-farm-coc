@@ -7,7 +7,7 @@ class FakeTemplates:
         self.visible = set(visible)
         self.positions = positions or {}
 
-    def find(self, image, name, threshold=None):
+    def find(self, image, name, threshold=None, anywhere=False, scales=(1.0,)):
         if name not in self.visible:
             return None
         x, y = self.positions.get(name, (100, 100))
@@ -35,6 +35,9 @@ class FakeAdb:
 
     def tap(self, x, y):
         self.calls.append(("tap", x, y))
+
+    def swipe(self, x1, y1, x2, y2, ms=500):
+        self.calls.append(("swipe", x1, y1, x2, y2, ms))
 
     def key_back(self):
         self.calls.append(("back",))

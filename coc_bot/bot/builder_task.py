@@ -19,6 +19,7 @@ log = logging.getLogger(__name__)
 MAX_BOAT_FAILURES = 3
 BATTLE_OVERRUN_S = 120
 MIN_STAGE_S = 8.0   # never end a stage for stagnation before this
+PREP_SETTLE_S = 1.0  # the prep screen ignores taps for a moment after the clouds clear
 
 
 class BuilderFarmTask:
@@ -50,6 +51,7 @@ class BuilderFarmTask:
         self._attack_started: datetime | None = None
         self._prev_attack_started: datetime | None = None
         self._record_pending = False
+        self._in_battle = False   # this battle was already counted (prep can show for several ticks)
         self._stage = 0
         self._stage_started: datetime | None = None
         self._last_damage = 0
@@ -123,6 +125,7 @@ class BuilderFarmTask:
 
     def _on_bb_home(self, now: datetime) -> None:
         self._stage_started = None
+        self._in_battle = False
         if self.loop.maybe_rest(now):
             return
         if not self._claimed_once or self._since_claim >= self.cfg.cart_every:
@@ -152,6 +155,7 @@ class BuilderFarmTask:
 
     # --- battle -------------------------------------------------------------
     def _begin_attack(self, now: datetime) -> None:
+        self._in_battle = True
         self.stats.attacks += 1
         self._since_claim += 1
         self._prev_attack_started = self._attack_started
@@ -161,7 +165,11 @@ class BuilderFarmTask:
         self._last_damage = 0
 
     def _on_prep(self, now: datetime) -> None:
-        self._begin_attack(now)
+        if not self._in_battle:
+            self._begin_attack(now)
+            self.sleep(PREP_SETTLE_S)
+        else:
+            log.info("Still preparing: the deploy did not start the battle, trying again")
         if self.mode == "elixir":
             self.game.drop_one_troop()
             self.sleep(self.cfg.surrender_after_s)
@@ -231,6 +239,7 @@ class BuilderFarmTask:
         if self._record_pending and self._attack_started is not None:
             self._record(now)
         self._stage_started = None
+        self._in_battle = False
         self.loop.act(self.game.return_home())
         self.sleep(self.loop.rng.uniform(2.0, 4.0))
 

@@ -52,7 +52,11 @@ class TemplateLibrary:
     def names(self) -> list[str]:
         return sorted(self._templates)
 
-    def find(self, image: np.ndarray, name: str, threshold: float | None = None) -> Match | None:
+    def find(self, image: np.ndarray, name: str, threshold: float | None = None,
+             anywhere: bool = False, scales: tuple[float, ...] = (1.0,)) -> Match | None:
+        """Best match of `name`, searched in its calibrated box (+ margin) unless `anywhere` is set
+        (for things that move with the camera, like the boat). `scales` also tries the template
+        resized, for map objects whose size follows the camera zoom."""
         template = self._templates.get(name)
         if template is None:
             return None
@@ -62,19 +66,25 @@ class TemplateLibrary:
             return None
         gray = image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         region, ox, oy = gray, 0, 0
-        box = self._boxes.get(name)
+        box = None if anywhere else self._boxes.get(name)
         if box is not None:
             x, y, w, h = box
             m = self._margin
             x0, y0 = max(0, x - m), max(0, y - m)
             x1, y1 = min(gray.shape[1], x + w + m), min(gray.shape[0], y + h + m)
             region, ox, oy = gray[y0:y1, x0:x1], x0, y0
-        th, tw = template.shape[:2]
-        if region.shape[0] < th or region.shape[1] < tw:
-            return None
-        result = cv2.matchTemplate(region, template, cv2.TM_CCOEFF_NORMED)
-        _, max_val, _, max_loc = cv2.minMaxLoc(result)
+        best: Match | None = None
+        for scale in scales:
+            scaled = template if scale == 1.0 else cv2.resize(
+                template, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
+            th, tw = scaled.shape[:2]
+            if region.shape[0] < th or region.shape[1] < tw:
+                continue
+            result = cv2.matchTemplate(region, scaled, cv2.TM_CCOEFF_NORMED)
+            _, max_val, _, max_loc = cv2.minMaxLoc(result)
+            if math.isfinite(max_val) and (best is None or max_val > best.score):
+                best = Match(name, ox + max_loc[0], oy + max_loc[1], tw, th, float(max_val))
         limit = self._threshold if threshold is None else threshold
-        if not math.isfinite(max_val) or max_val < limit:
+        if best is None or best.score < limit:
             return None
-        return Match(name, ox + max_loc[0], oy + max_loc[1], tw, th, float(max_val))
+        return best
