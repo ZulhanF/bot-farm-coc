@@ -44,11 +44,10 @@ SCREEN_MARKERS: tuple[tuple[Screen, str], ...] = (
 )
 
 
-# Builder Base: result first (it may still show battle buttons), prep screens before battle (the
-# surrender button is already visible while preparing), the home village last (boat target).
+# Builder Base: result first (it may still show battle buttons), the prep banner before battle buttons,
+# the home village last (boat target). Stage-2 prep = prep banner + End Battle (see detect_builder_screen).
 BUILDER_MARKERS: tuple[tuple[Screen, str], ...] = (
     (Screen.BB_RESULT, N.BB_BTN_RETURN_HOME),
-    (Screen.BB_STAGE2_PREP, N.BB_STAGE2_PREP),
     (Screen.BB_PREP, N.BB_PREP),
     (Screen.BB_BATTLE, N.BB_BTN_SURRENDER),
     (Screen.BB_BATTLE, N.BB_BTN_END_BATTLE),
@@ -74,4 +73,8 @@ def detect_screen(image: np.ndarray, templates: TemplateFinder) -> Screen:
 
 
 def detect_builder_screen(image: np.ndarray, templates: TemplateFinder) -> Screen:
-    return _detect(image, templates, BUILDER_MARKERS)
+    screen = _detect(image, templates, BUILDER_MARKERS)
+    # Both stages show the same "battle starts in" banner; only stage 2 offers End Battle while preparing.
+    if screen is Screen.BB_PREP and templates.find(image, N.BB_BTN_END_BATTLE) is not None:
+        return Screen.BB_STAGE2_PREP
+    return screen

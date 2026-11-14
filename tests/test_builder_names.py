@@ -19,14 +19,14 @@ def test_elixir_mode_needs_one_slot_and_stage1_point():
     assert ("point", "bb_slot_2") in items
     assert ("point", N.BB_DEPLOY_STAGE1) in items
     assert ("point", N.BB_DEPLOY_STAGE2) not in items
-    assert ("template", N.BB_STAGE2_PREP) not in items
+    assert ("template", N.BB_BTN_END_BATTLE) not in items
     assert ("template", N.BB_BOAT) in items and ("template", N.HOME_ATTACK) in items
 
 
 def test_gold_mode_needs_stage2_and_damage_roi():
     items = N.builder_requirements(builder(mode="gold", hero_slot=1, tank_slot=2, main_slots=(3, 4),
                                            stage2_slots=(5,)))
-    assert ("template", N.BB_STAGE2_PREP) in items
+    assert ("template", N.BB_BTN_END_BATTLE) in items
     assert ("roi", N.ROI_BB_DAMAGE) in items
     assert ("point", N.BB_DEPLOY_STAGE2) in items
     assert [n for k, n in items if n.startswith("bb_slot_")] == [f"bb_slot_{i}" for i in (1, 2, 3, 4, 5)]
@@ -77,7 +77,7 @@ def test_relevant_for_mode_builder_includes_optional_items():
 def test_detect_builder_screens_in_priority_order():
     cases = [
         ({N.BB_BTN_RETURN_HOME, N.BB_BTN_SURRENDER}, Screen.BB_RESULT),
-        ({N.BB_STAGE2_PREP, N.BB_BTN_END_BATTLE}, Screen.BB_STAGE2_PREP),
+        ({N.BB_PREP, N.BB_BTN_END_BATTLE}, Screen.BB_STAGE2_PREP),   # stage 2 prep has End Battle
         ({N.BB_PREP, N.BB_BTN_SURRENDER}, Screen.BB_PREP),
         ({N.BB_BTN_SURRENDER}, Screen.BB_BATTLE),
         ({N.BB_BTN_END_BATTLE}, Screen.BB_BATTLE),

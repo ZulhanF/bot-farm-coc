@@ -25,15 +25,14 @@ BB_BOAT = "bb_boat"                    # boat on the home village that sails to 
 BB_ATTACK = "bb_attack"                # Attack button on the Builder Base (also its screen marker)
 BB_BTN_FIND_NOW = "bb_btn_find_now"    # "Find Now" in the Builder Base attack panel
 BB_SEARCHING = "bb_searching"          # searching for an opponent
-BB_PREP = "bb_prep"                    # stage-1 preparation banner ("battle starts in ...")
-BB_STAGE2_PREP = "bb_stage2_prep"      # stage-2 preparation screen
+BB_PREP = "bb_prep"                    # preparation banner ("battle starts in ..."), both stages
 BB_BTN_SURRENDER = "bb_btn_surrender"  # Surrender during a Builder Base battle
-BB_BTN_END_BATTLE = "bb_btn_end_battle"  # End Battle (after stars, or on the stage-2 screen)
+BB_BTN_END_BATTLE = "bb_btn_end_battle"  # "Akhiri Serangan": replaces Surrender after a star; also on stage-2 prep
 BB_BTN_RETURN_HOME = "bb_btn_return_home"  # Return Home on the Builder Base result screen
 BB_ELIXIR_CART = "bb_elixir_cart"      # the Elixir Cart next to the boat
 BB_BTN_COLLECT = "bb_btn_collect"      # Collect in the Elixir Cart window
 BB_TEMPLATES = (
-    BB_BOAT, BB_ATTACK, BB_BTN_FIND_NOW, BB_SEARCHING, BB_PREP, BB_STAGE2_PREP, BB_BTN_SURRENDER,
+    BB_BOAT, BB_ATTACK, BB_BTN_FIND_NOW, BB_SEARCHING, BB_PREP, BB_BTN_SURRENDER,
     BB_BTN_END_BATTLE, BB_BTN_RETURN_HOME, BB_ELIXIR_CART, BB_BTN_COLLECT,
 )
 
@@ -192,7 +191,7 @@ _BB_BASE_TEMPLATES = (
     BB_ELIXIR_CART, BB_BTN_COLLECT, POPUP_OKAY,
 )
 _BB_OPTIONAL = (
-    [("template", n) for n in (BB_SEARCHING, BB_BTN_END_BATTLE, BB_STAGE2_PREP,
+    [("template", n) for n in (BB_SEARCHING, BB_BTN_END_BATTLE,
                                POPUP_RELOAD, POPUP_TRY_AGAIN, POPUP_CLOSE)]
     + [("roi", ROI_BB_DAMAGE), ("roi", ROI_BB_RESULT_GOLD)]
 )
@@ -217,7 +216,7 @@ def builder_requirements(settings: Settings) -> list[tuple[str, str]]:
     gold = b.mode == "gold"
     items = [("template", n) for n in _BB_BASE_TEMPLATES]
     if gold:
-        items += [("template", BB_STAGE2_PREP), ("roi", ROI_BB_DAMAGE)]
+        items += [("template", BB_BTN_END_BATTLE), ("roi", ROI_BB_DAMAGE)]
     items.append(("point", BB_DEPLOY_STAGE1))
     if gold and b.stage2:
         items.append(("point", BB_DEPLOY_STAGE2))

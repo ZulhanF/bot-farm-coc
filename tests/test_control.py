@@ -83,4 +83,4 @@ def test_builder_mode_override_drives_calibration_check(tmp_path):
     (tmp_path / "settings.toml").write_text('[builder]\nmode = "elixir"\n', encoding="utf-8")
     runner = BotRunner(tmp_paths(tmp_path), Mode.BUILDER, builder_mode="gold")
     assert runner.run() == 2
-    assert "template:bb_stage2_prep" in runner.status().error
+    assert "template:bb_btn_end_battle" in runner.status().error

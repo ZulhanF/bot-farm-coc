@@ -100,7 +100,7 @@ then lists the Builder Base items; `check --mode builder` prints them too.
 | Kind | Items |
 |---|---|
 | Buttons | `bb_boat` (home village), `bb_attack`, `bb_btn_find_now`, `bb_btn_surrender`, `bb_btn_return_home`, `bb_elixir_cart`, `bb_btn_collect` |
-| Screens | `bb_prep` (stage-1 "battle starts" banner), `bb_stage2_prep` (gold) |
+| Screens | `bb_prep` ("battle starts in" banner), `bb_btn_end_battle` (gold: *Akhiri Serangan*, also tells stage-2 prep apart) |
 | Deploy | `bb_deploy_stage1`, `bb_deploy_stage2` (gold), `bb_slot_N` (each card you use) |
 | OCR | `bb_damage` (gold), `bb_result_gold` (optional) |
 
