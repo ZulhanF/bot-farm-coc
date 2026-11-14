@@ -14,7 +14,7 @@ from textual.theme import Theme
 from textual.widgets import ContentSwitcher, Footer, OptionList, Static
 from textual.widgets.option_list import Option
 
-from coc_bot.control import BotRunner, Mode, Paths, State
+from coc_bot.control import BotRunner, Mode, Paths, State, mode_label
 from coc_bot.logs import FORMAT, setup_logging
 from coc_bot.tui.pages import (
     BotPage, CalibrationPage, HomePage, LogPage, ModePage, Page, SettingsPage, StatsPage, VisionPage,
@@ -144,9 +144,10 @@ class DashboardApp(App):
             self.notify("Disegarkan", timeout=1.5)
 
     # --- bot control --------------------------------------------------------------------------------
-    def set_mode(self, mode: Mode) -> None:
+    def set_mode(self, mode: Mode, builder_mode: str | None = None) -> None:
         self.mode = mode
         self.runner.mode = mode
+        self.runner.builder_mode = builder_mode if mode is Mode.BUILDER else None
         self._tick()
 
     def set_check_storage(self, on: bool) -> None:
@@ -161,7 +162,7 @@ class DashboardApp(App):
 
     def action_start(self) -> None:
         if self.runner.start(self.mode):
-            self.notify(f"Bot dimulai (mode {self.mode.value})")
+            self.notify(f"Bot dimulai (mode {mode_label(self.mode, self.runner.builder_mode)})")
             self.action_page("bot")
         else:
             self.notify("Bot sudah berjalan", severity="warning")
@@ -211,7 +212,7 @@ class DashboardApp(App):
     def _tick(self) -> None:
         status = self.runner.status()
         bar = Text.assemble(" ", state_text(status.state), ("  │  ", "dim"), ("mode ", "dim"),
-                            (status.mode.value, "bold"))
+                            (mode_label(status.mode, status.builder_mode), "bold"))
         if status.screen:
             bar.append_text(Text.assemble(("  │  ", "dim"), ("layar ", "dim"), (status.screen, "bold")))
         if self.runner.active:
@@ -226,7 +227,8 @@ class DashboardApp(App):
             bar.append_text(Text.assemble(("  │  ", "dim"), (status.error[:80], "red")))
         self.query_one("#statusbar", Static).update(bar)
         self.query_one("#sidebar-mode", Static).update(Text.assemble(
-            ("mode  ", "dim"), (self.mode.value, "bold #e05ce6"), "\n", state_text(status.state)))
+            ("mode  ", "dim"), (mode_label(self.mode, self.runner.builder_mode), "bold #e05ce6"), "\n",
+            state_text(status.state)))
         self.query_one(BotPage).update_status()
 
 

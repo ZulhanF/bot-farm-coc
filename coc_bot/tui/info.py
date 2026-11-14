@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from coc_bot import __version__
 from coc_bot import names as N
 from coc_bot.config import Settings, load_settings
-from coc_bot.control import EXPECTED_SHAPE, Paths, connect, load_templates
+from coc_bot.control import EXPECTED_SHAPE, Mode, Paths, connect, load_templates, with_builder_mode
 
 
 @dataclass
@@ -51,17 +51,19 @@ def describe_settings(info: SystemInfo, settings: Settings) -> None:
                     if s.enabled else "off")
 
 
-def gather(paths: Paths, probe_emulator: bool = True) -> SystemInfo:
+def gather(paths: Paths, probe_emulator: bool = True, mode: str = "home",
+           builder_mode: str | None = None) -> SystemInfo:
     """Read config and (optionally) take one screenshot to check the emulator. Never raises."""
     info = SystemInfo()
     try:
-        settings = load_settings(paths.settings, paths.calibration)
+        settings = with_builder_mode(load_settings(paths.settings, paths.calibration),
+                                     Mode(mode), builder_mode)
         templates = load_templates(paths, settings)
     except (ValueError, OSError) as exc:
         info.settings_error = str(exc)
         return info
     describe_settings(info, settings)
-    info.missing = N.missing_calibration(settings, set(templates.names()))
+    info.missing = N.missing_for_mode(settings, set(templates.names()), mode)
     if not probe_emulator:
         return info
     try:

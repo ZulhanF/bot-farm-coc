@@ -10,15 +10,16 @@ import logging
 import random
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
 from coc_bot import names as N
-from coc_bot.bot.records import CsvRecorder
+from coc_bot.bot.engine import FatalError, ScreenLoop, Stats
+from coc_bot.bot.home_task import HomeFarmTask
+from coc_bot.bot.records import BUILDER_FIELDS, CsvRecorder
 from coc_bot.bot.session import SessionPolicy
-from coc_bot.bot.state_machine import Bot, FatalError, Stats
 from coc_bot.config import Settings, load_settings
 from coc_bot.device.adb import AdbError, EmulatorAdb, find_adb
 from coc_bot.vision.templates import TemplateLibrary
@@ -28,7 +29,7 @@ EXPECTED_SHAPE = (720, 1280)
 
 
 class Mode(str, Enum):
-    """What the bot does when started. Only `home` exists so far; the rest are on the roadmap."""
+    """What the bot does when started."""
     HOME = "home"
     BUILDER = "builder"
     WALLS = "walls"
@@ -37,10 +38,27 @@ class Mode(str, Enum):
 
 MODE_INFO: dict[Mode, tuple[str, bool]] = {   # mode -> (description, available)
     Mode.HOME: ("Farm desa siang terus-menerus (E-Drag, spell, cek storage)", True),
-    Mode.BUILDER: ("Farm desa malam (Night Witch + Battle Copter)", False),
+    Mode.BUILDER: ("Farm desa malam: elixir (1 troop + menyerah) / gold (Copter + Night Witch)", True),
     Mode.WALLS: ("Habiskan resource ke wall lalu selesai", False),
     Mode.AUTO: ("Semua tugas lewat penjadwal", False),
 }
+BUILDER_SUB_MODES: dict[str, str] = {
+    "elixir": "1 troop lalu menyerah, klaim Elixir Cart tiap N serangan (trofi turun)",
+    "gold": "Copter + Giant + Night Witch di satu titik, serang tahap 2",
+}
+
+
+def with_builder_mode(settings: Settings, mode: Mode, builder_mode: str | None) -> Settings:
+    """Settings as the run will use them: a chosen Builder Base sub-mode overrides [builder] mode."""
+    if mode is not Mode.BUILDER or not builder_mode:
+        return settings
+    return replace(settings, builder=replace(settings.builder, mode=builder_mode))
+
+
+def mode_label(mode: Mode, builder_mode: str | None) -> str:
+    if mode is Mode.BUILDER and builder_mode:
+        return f"{mode.value} ({builder_mode})"
+    return mode.value
 
 
 class State(str, Enum):
@@ -69,6 +87,7 @@ class Status:
     started_at: datetime | None = None
     stats: Stats = field(default_factory=Stats)
     error: str | None = None
+    builder_mode: str | None = None
 
 
 def load_templates(paths: Paths, settings: Settings) -> TemplateLibrary:
@@ -83,13 +102,15 @@ def connect(settings: Settings) -> EmulatorAdb:
 
 
 class BotRunner:
-    def __init__(self, paths: Paths | None = None, mode: Mode = Mode.HOME) -> None:
+    def __init__(self, paths: Paths | None = None, mode: Mode = Mode.HOME,
+                 builder_mode: str | None = None) -> None:
         self.paths = paths or Paths()
         self.mode = mode
+        self.builder_mode = builder_mode   # Builder Base sub-mode; None = [builder] mode in settings
         self.check_storage = True   # False = keep attacking with full storages (testing)
         self._state = State.IDLE
         self._error: str | None = None
-        self._bot: Bot | None = None
+        self._bot: ScreenLoop | None = None
         self._started_at: datetime | None = None
         self._stop = threading.Event()
         self._running = threading.Event()   # cleared while paused
@@ -153,7 +174,8 @@ class BotRunner:
         bot = self._bot
         screen = bot.current_screen.name if bot is not None and bot.current_screen is not None else None
         return Status(self._state, self.mode, screen, self._started_at,
-                      bot.stats if bot is not None else Stats(), self._error)
+                      bot.stats if bot is not None else Stats(), self._error,
+                      builder_mode=self.builder_mode)
 
     # --- the run itself -----------------------------------------------------
     def _sleep(self, seconds: float) -> None:
@@ -182,11 +204,12 @@ class BotRunner:
         game = None
         code = 0
         try:
-            if self.mode is not Mode.HOME:
+            if self.mode not in (Mode.HOME, Mode.BUILDER):
                 return self._fail(f"Mode '{self.mode.value}' belum tersedia", 2)
-            settings = load_settings(self.paths.settings, self.paths.calibration)
+            settings = with_builder_mode(load_settings(self.paths.settings, self.paths.calibration),
+                                         self.mode, self.builder_mode)
             templates = load_templates(self.paths, settings)
-            missing = N.missing_calibration(settings, set(templates.names()))
+            missing = N.missing_for_mode(settings, set(templates.names()), self.mode.value)
             if missing:
                 return self._fail("Calibration incomplete, missing: " + ", ".join(missing), 2)
             adb = connect(settings)
@@ -196,10 +219,18 @@ class BotRunner:
             if self._stop.is_set():
                 return 0
             rng = random.Random()
-            game = Game(adb, templates, OcrReader(rapidocr_engine()), settings, rng, sleep=self._sleep)
-            self._bot = Bot(game, SessionPolicy(settings.session, rng), settings, rng,
-                            clock=datetime.now, sleep=self._sleep,
-                            recorder=CsvRecorder(self.paths.logs))
+            ocr = OcrReader(rapidocr_engine())
+            if self.mode is Mode.BUILDER:
+                from coc_bot.bot.builder_task import BuilderFarmTask
+                from coc_bot.game.builder import BuilderGame
+                game = BuilderGame(adb, templates, ocr, settings, rng, sleep=self._sleep)
+                task = BuilderFarmTask(self.builder_mode,
+                                       CsvRecorder(self.paths.logs, "builder", BUILDER_FIELDS))
+            else:
+                game = Game(adb, templates, ocr, settings, rng, sleep=self._sleep)
+                task = HomeFarmTask(CsvRecorder(self.paths.logs))
+            self._bot = ScreenLoop(game, task, SessionPolicy(settings.session, rng), settings, rng,
+                                   clock=datetime.now, sleep=self._sleep)
             self._bot.check_storage = self.check_storage
             if self._stop.is_set():
                 return 0

@@ -20,7 +20,9 @@ from textual.widgets.option_list import Option
 from coc_bot import names as N
 from coc_bot.bot.stats_report import attack_logs, log_for, read_attacks, summarize
 from coc_bot.config import load_settings
-from coc_bot.control import MODE_INFO, Mode, State, connect, load_templates
+from coc_bot.control import (
+    BUILDER_SUB_MODES, MODE_INFO, Mode, State, connect, load_templates, mode_label, with_builder_mode,
+)
 from coc_bot.tui.info import SystemInfo, gather
 
 if TYPE_CHECKING:
@@ -123,15 +125,17 @@ class HomePage(Page):
 
     @work(thread=True, exclusive=True, group="info")
     def load_info(self) -> None:
-        info = gather(self.dash.paths, self.dash.probe_emulator)
+        info = gather(self.dash.paths, self.dash.probe_emulator, self.dash.mode.value,
+                      self.dash.runner.builder_mode)
         self.app.call_from_thread(self._show_info, info)
 
     def _show_info(self, info: SystemInfo) -> None:
         self.query_one("#sysinfo", Static).update(
-            self.render_info(info, self.dash.mode, self.dash.runner.check_storage))
+            self.render_info(info, mode_label(self.dash.mode, self.dash.runner.builder_mode),
+                             self.dash.runner.check_storage))
 
     @staticmethod
-    def render_info(info: SystemInfo, mode: Mode, check_storage: bool = True) -> Table:
+    def render_info(info: SystemInfo, mode_text: str, check_storage: bool = True) -> Table:
         table = Table.grid(padding=(0, 2))
         table.add_column(style="bold #ffc83d", no_wrap=True)
         table.add_column()
@@ -161,7 +165,7 @@ class HomePage(Page):
             table.add_row("Cek penuh", Text(f"ON: {checks} ≥{info.full_ratio:.0%} → {info.on_full}"))
         else:
             table.add_row("Cek penuh", Text("OFF (kalibrasi bar storage)", style="yellow"))
-        table.add_row("Mode", Text(mode.value, style="bold"))
+        table.add_row("Mode", Text(mode_text, style="bold"))
         table.add_row("Deploy", f"{info.pattern}, slot {', '.join(map(str, info.troop_slots)) or '-'}")
         table.add_row("Spell", f"slot {', '.join(map(str, info.spell_slots))}" if info.spell_slots else "off")
         g, e, d = info.min_loot
@@ -215,7 +219,7 @@ class BotPage(Page):
         table.add_column(style="bold #ffc83d", no_wrap=True)
         table.add_column()
         table.add_row("Status", state_text(status.state))
-        table.add_row("Mode", status.mode.value)
+        table.add_row("Mode", mode_label(status.mode, status.builder_mode))
         table.add_row("Layar", status.screen or "-")
         running = status.state in (State.RUNNING, State.PAUSED, State.STOPPING)
         if status.started_at and running:
@@ -225,7 +229,11 @@ class BotPage(Page):
             table.add_row("Serangan", f"{status.stats.attacks}  ({status.stats.per_hour(hours)})")
         else:
             table.add_row("Serangan", str(status.stats.attacks))
-        table.add_row("Dilewati", str(status.stats.skipped))
+        if status.mode is Mode.BUILDER:
+            table.add_row("Cart diklaim", str(status.stats.carts))
+            table.add_row("Tahap 2", str(status.stats.stage2))
+        else:
+            table.add_row("Dilewati", str(status.stats.skipped))
         table.add_row("Recovery", f"{status.stats.recoveries} (restart {status.stats.restarts})")
         table.add_row("Cek storage", Text("ON", style="green") if self.dash.runner.check_storage
                       else Text("OFF (tetap menyerang walau penuh)", style="yellow"))
@@ -262,7 +270,12 @@ class ModePage(Page):
                      "lihat docs/ROADMAP.md.", classes="hint")
         options = []
         for mode, (desc, available) in MODE_INFO.items():
-            prompt = Text.assemble((f"{mode.value:<8}", "bold"), ("  " + desc, "" if available else "dim"),
+            if mode is Mode.BUILDER:
+                for sub, sub_desc in BUILDER_SUB_MODES.items():
+                    prompt = Text.assemble((f"{'builder ' + sub:<15}", "bold"), ("  " + sub_desc, ""))
+                    options.append(Option(prompt, id=f"builder:{sub}"))
+                continue
+            prompt = Text.assemble((f"{mode.value:<15}", "bold"), ("  " + desc, "" if available else "dim"),
                                    ("" if available else "  (segera)", "italic dim"))
             options.append(Option(prompt, id=mode.value, disabled=not available))
         yield OptionList(*options, id="mode-list", classes="panel")
@@ -272,12 +285,13 @@ class ModePage(Page):
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         event.stop()
-        mode = Mode(event.option.id)
+        value, _, sub = event.option.id.partition(":")
+        mode = Mode(value)
         if self.dash.runner.active:
             self.app.notify("Hentikan bot dulu untuk ganti mode.", severity="warning")
             return
-        self.dash.set_mode(mode)
-        self.app.notify(f"Mode: {mode.value}")
+        self.dash.set_mode(mode, sub or None)
+        self.app.notify(f"Mode: {mode_label(mode, sub or None)}")
 
 
 # --- 4. Kalibrasi ----------------------------------------------------------------------------------
@@ -305,15 +319,17 @@ class CalibrationPage(Page):
         summary = self.query_one("#cal-summary", Static)
         table.clear()
         try:
-            settings = load_settings(self.dash.paths.settings, self.dash.paths.calibration)
+            settings = with_builder_mode(load_settings(self.dash.paths.settings, self.dash.paths.calibration),
+                                         self.dash.mode, self.dash.runner.builder_mode)
             templates = load_templates(self.dash.paths, settings)
         except (ValueError, OSError) as exc:
             summary.update(Text(f"✗ {exc}", style="red"))
             return
-        missing = set(N.missing_calibration(settings, set(templates.names())))
+        mode = self.dash.mode.value
+        missing = set(N.missing_for_mode(settings, set(templates.names()), mode))
         cal = settings.calibration
         have = {"template": cal.templates, "roi": cal.rois, "point": cal.points}
-        relevant = N.relevant_names(settings)
+        relevant = N.relevant_for_mode(settings, mode)
         if self._show_all:
             items = [(k, n) for k in ("template", "roi", "point")
                      for n in N.valid_names(k, N.used_slots(settings))]

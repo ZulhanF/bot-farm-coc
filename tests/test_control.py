@@ -10,11 +10,11 @@ def tmp_paths(tmp_path):
 
 
 def test_unavailable_mode_fails_without_touching_adb(tmp_path):
-    runner = BotRunner(tmp_paths(tmp_path), Mode.BUILDER)
+    runner = BotRunner(tmp_paths(tmp_path), Mode.WALLS)
     assert runner.run() == 2
     status = runner.status()
     assert status.state is State.ERROR
-    assert "builder" in status.error
+    assert "walls" in status.error
 
 
 def test_incomplete_calibration_fails(tmp_path):
@@ -62,3 +62,25 @@ def test_storage_check_switch_reaches_the_running_bot(tmp_path):
     runner._bot = FakeBot()
     runner.set_check_storage(False)
     assert runner.check_storage is False and runner._bot.check_storage is False
+
+
+def test_builder_mode_checks_builder_calibration(tmp_path):
+    runner = BotRunner(tmp_paths(tmp_path), Mode.BUILDER)
+    assert runner.run() == 2
+    error = runner.status().error
+    assert "template:bb_boat" in error and "template:btn_next" not in error
+
+
+def test_builder_sub_mode_label(tmp_path):
+    from coc_bot.control import mode_label
+    runner = BotRunner(tmp_paths(tmp_path), Mode.BUILDER, builder_mode="gold")
+    assert runner.status().builder_mode == "gold"
+    assert mode_label(Mode.BUILDER, "gold") == "builder (gold)"
+    assert mode_label(Mode.HOME, "gold") == "home"
+
+
+def test_builder_mode_override_drives_calibration_check(tmp_path):
+    (tmp_path / "settings.toml").write_text('[builder]\nmode = "elixir"\n', encoding="utf-8")
+    runner = BotRunner(tmp_paths(tmp_path), Mode.BUILDER, builder_mode="gold")
+    assert runner.run() == 2
+    assert "template:bb_stage2_prep" in runner.status().error

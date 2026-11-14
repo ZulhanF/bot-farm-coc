@@ -60,3 +60,10 @@ def test_test_vision_prints_screen(tmp_path, capsys):
     cv2.imwrite(str(img_path), np.zeros((720, 1280, 3), np.uint8))
     assert main(base_args(tmp_path) + ["test-vision", str(img_path)]) == 0
     assert "Screen: UNKNOWN" in capsys.readouterr().out
+
+
+def test_check_builder_mode_lists_builder_items(tmp_path, capsys):
+    assert main(base_args(tmp_path) + ["check", "--mode", "builder"]) == 2
+    out = capsys.readouterr().out
+    assert "template:bb_boat" in out
+    assert "template:btn_next" not in out

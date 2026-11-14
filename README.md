@@ -33,6 +33,8 @@
 - **Storage-full check** — reads your resource bars and stops or waits when everything is full.
 - **Self-recovery** — popups, stuck screens and lost ADB connections: *Back* → game restart → safe stop.
 - **Human-like** — tap jitter, random delays, optional play / break sessions with a daily cap.
+- **Builder Base** — `elixir` mode (drop one troop, surrender, collect the Elixir Cart every N attacks) or
+  `gold` mode (hero + Giant + Night Witch at one point, stage 2 included).
 - **Terminal dashboard** — start, pause, stop, calibrate, edit settings, read logs and stats in one place.
 
 ## Dashboard
@@ -50,7 +52,7 @@
 |:---:|---|---|
 | `1` | Beranda | Emulator, resolution, calibration, storage levels, active settings |
 | `2` | Bot | Start / pause / stop, storage-check switch, live status and log |
-| `3` | Mode | What runs on start (`home`; `builder`, `walls`, `auto` planned) |
+| `3` | Mode | What runs on start: `home`, `builder elixir`, `builder gold` (`walls`, `auto` planned) |
 | `4` | Kalibrasi | Items your settings use, ✓ / ✗ — **Enter** to calibrate, **A** to show all |
 | `5` | Pengaturan | Edit `settings.toml`, validated on **Ctrl+S** |
 | `6` | Log | Today's log, coloured by level |
@@ -90,6 +92,24 @@ Check the result on page `8`. Pick the static part of a button, not its glow.
 
 **4. Run** — page `2`, **Start** (or `S`).
 
+### Builder Base (desa malam)
+
+Pick `builder elixir` or `builder gold` on page `3` (or `run --mode builder --builder-mode gold`). Page `4`
+then lists the Builder Base items; `check --mode builder` prints them too.
+
+| Kind | Items |
+|---|---|
+| Buttons | `bb_boat` (home village), `bb_attack`, `bb_btn_find_now`, `bb_btn_surrender`, `bb_btn_return_home`, `bb_elixir_cart`, `bb_btn_collect` |
+| Screens | `bb_prep` (stage-1 "battle starts" banner), `bb_stage2_prep` (gold) |
+| Deploy | `bb_deploy_stage1`, `bb_deploy_stage2` (gold), `bb_slot_N` (each card you use) |
+| OCR | `bb_damage` (gold), `bb_result_gold` (optional) |
+
+- **elixir** — Builder Elixir comes from the defense every search opens, so the bot surrenders at once and
+  collects the Elixir Cart every `cart_every` attacks. Surrendering wins no trophies, so **your Builder
+  trophies (and the elixir per defense) drop over time**.
+- **gold** — choose Battle Copter in the Builder Base army; Giant on `tank_slot`, Night Witches on
+  `main_slots`. Stage 2 is attacked when it appears (`stage2 = false` ends the battle instead).
+
 ## Configuration
 
 `settings.toml` — edit on page `5` or in any editor. Full reference: [`settings.example.toml`](settings.example.toml).
@@ -102,6 +122,7 @@ Check the result on page `8`. Pick the static part of a button, not its glow.
 | `[storage]` | `full_ratio`, `on_full` (`"stop"` / `"wait"`), `wait_minutes` |
 | `[timing]` | `battle_timeout_s`, `damage_stagnant_s`, `tap_delay_ms`, `progress_timeout_s` |
 | `[session]` | `enabled`, `play_minutes`, `break_minutes`, `active_hours`, `max_hours_per_day` |
+| `[builder]` | `mode` (`"elixir"` / `"gold"`), `cart_every`, `troop_slot`, `hero_slot`, `tank_slot`, `main_slots`, `stage2` |
 
 > [!IMPORTANT]
 > Running 24/7 with `session.enabled = false` is the easiest pattern for anti-bot systems to spot.
@@ -111,12 +132,13 @@ Check the result on page `8`. Pick the static part of a button, not its glow.
 | Command | |
 |---|---|
 | `python -m coc_bot` | Dashboard |
-| `python -m coc_bot run [--mode home]` | Run without the dashboard (**Ctrl+C** stops) |
-| `python -m coc_bot check` | Missing calibration items |
+| `python -m coc_bot run [--mode home\|builder] [--builder-mode elixir\|gold]` | Run without the dashboard (**Ctrl+C** stops) |
+| `python -m coc_bot check [--mode builder]` | Missing calibration items |
 | `python -m coc_bot calibrate <template\|roi\|point> <name>` | Calibrate one item |
 | `python -m coc_bot screenshot` · `test-vision <image>` | Save / analyse a screenshot |
 
-Logs: `logs/bot-YYYY-MM-DD.log`, per-attack `logs/attacks-YYYY-MM-DD.csv`, and `logs/screens/` on recovery.
+Logs: `logs/bot-YYYY-MM-DD.log`, per-attack `logs/attacks-YYYY-MM-DD.csv` (Builder Base:
+`logs/builder-YYYY-MM-DD.csv`), and `logs/screens/` on recovery.
 Tests run without an emulator: `.venv\Scripts\python -m pytest -q`.
 
 ## Troubleshooting

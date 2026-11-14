@@ -17,6 +17,12 @@ class Screen(Enum):
     BASE_PREVIEW = "base_preview"
     BATTLE = "battle"
     RESULT = "result"
+    BB_HOME = "bb_home"
+    BB_SEARCHING = "bb_searching"
+    BB_PREP = "bb_prep"
+    BB_STAGE2_PREP = "bb_stage2_prep"
+    BB_BATTLE = "bb_battle"
+    BB_RESULT = "bb_result"
     POPUP = "popup"
     UNKNOWN = "unknown"
 
@@ -38,11 +44,34 @@ SCREEN_MARKERS: tuple[tuple[Screen, str], ...] = (
 )
 
 
-def detect_screen(image: np.ndarray, templates: TemplateFinder) -> Screen:
+# Builder Base: result first (it may still show battle buttons), prep screens before battle (the
+# surrender button is already visible while preparing), the home village last (boat target).
+BUILDER_MARKERS: tuple[tuple[Screen, str], ...] = (
+    (Screen.BB_RESULT, N.BB_BTN_RETURN_HOME),
+    (Screen.BB_STAGE2_PREP, N.BB_STAGE2_PREP),
+    (Screen.BB_PREP, N.BB_PREP),
+    (Screen.BB_BATTLE, N.BB_BTN_SURRENDER),
+    (Screen.BB_BATTLE, N.BB_BTN_END_BATTLE),
+    (Screen.BB_HOME, N.BB_ATTACK),
+    (Screen.BB_SEARCHING, N.BB_SEARCHING),
+    (Screen.HOME, N.HOME_ATTACK),
+)
+
+
+def _detect(image: np.ndarray, templates: TemplateFinder,
+            markers: tuple[tuple[Screen, str], ...]) -> Screen:
     for name in N.POPUP_TEMPLATES:
         if templates.find(image, name) is not None:
             return Screen.POPUP
-    for screen, name in SCREEN_MARKERS:
+    for screen, name in markers:
         if templates.find(image, name) is not None:
             return screen
     return Screen.UNKNOWN
+
+
+def detect_screen(image: np.ndarray, templates: TemplateFinder) -> Screen:
+    return _detect(image, templates, SCREEN_MARKERS)
+
+
+def detect_builder_screen(image: np.ndarray, templates: TemplateFinder) -> Screen:
+    return _detect(image, templates, BUILDER_MARKERS)

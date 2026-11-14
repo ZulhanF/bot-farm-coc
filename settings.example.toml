@@ -53,6 +53,25 @@ full_ratio = 0.95        # full when every checked storage is at least this full
 on_full = "stop"         # "stop" = end the run, "wait" = sleep wait_minutes, then check again
 wait_minutes = 30
 
+[builder]
+# Builder Base (desa malam), used by `run --mode builder`. Card slots = points bb_slot_N.
+mode = "elixir"          # "elixir" = drop 1 troop + surrender (elixir comes from defenses, trophies drop)
+                         # "gold"   = hero + Giant + Night Witch at one point, stage 2 too
+cart_every = 15          # collect the Elixir Cart every N attacks
+troop_slot = 2           # elixir: card dropped before surrendering
+surrender_after_s = 1.5
+hero_slot = 1            # gold: hero card (choose Battle Copter in the Builder Base army screen)
+tank_slot = 2            # gold: Giant (0 = no tank)
+main_slots = [3, 4, 5, 6]  # gold: Night Witch cards
+taps_per_slot = 3
+witch_delay_s = 2.0
+ability_every_s = 3.0    # tap the hero card this often to fire its ability
+bat_swarm_after_s = 6.0
+damage_stagnant_s = 12.0
+battle_timeout_s = 150
+stage2 = true
+stage2_slots = []        # extra stage-2 cards (Reinforcement Camp)
+
 [vision]
 threshold = 0.85
 search_margin_px = 40

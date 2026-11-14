@@ -81,6 +81,38 @@ class VisionConfig:
     search_margin_px: int = 40
 
 
+BUILDER_MODES = ("elixir", "gold")
+BB_MAX_SLOTS = 8
+
+
+@dataclass(frozen=True)
+class BuilderConfig:
+    mode: str = "elixir"             # "elixir" = 1 troop + surrender, "gold" = hero + tank + Night Witch push
+    cart_every: int = 15             # collect the Elixir Cart every N attacks (both modes)
+    troop_slot: int = 2              # elixir: the one card dropped before surrendering
+    surrender_after_s: float = 1.5
+    hero_slot: int = 1               # gold: hero card (pick Battle Copter in the army screen)
+    tank_slot: int = 2               # gold: Giant; 0 = no tank
+    main_slots: tuple[int, ...] = (3, 4, 5, 6)   # gold: Night Witch cards
+    taps_per_slot: int = 3           # taps on the deploy point per card (empties the card)
+    witch_delay_s: float = 2.0       # wait after the tank before the Night Witches
+    ability_every_s: float = 3.0     # tap the hero card this often (does nothing until charged)
+    bat_swarm_after_s: float = 6.0   # tap the Night Witch cards once (Bat Swarm) after this long
+    damage_stagnant_s: float = 12.0  # end the stage if the damage % stops rising this long
+    battle_timeout_s: int = 150      # per stage (the game's own timer is 2 minutes)
+    stage2: bool = True              # attack stage 2 when it appears
+    stage2_slots: tuple[int, ...] = ()   # extra cards on stage 2 (Reinforcement Camp troops)
+
+    def __post_init__(self) -> None:
+        if self.mode not in BUILDER_MODES:
+            raise ValueError(f"[builder] mode must be one of {', '.join(BUILDER_MODES)}, got {self.mode!r}")
+        if self.cart_every < 1:
+            raise ValueError("[builder] cart_every must be at least 1")
+        slots = (self.troop_slot, self.hero_slot, *self.main_slots, *self.stage2_slots)
+        if any(not 1 <= s <= BB_MAX_SLOTS for s in slots) or not 0 <= self.tank_slot <= BB_MAX_SLOTS:
+            raise ValueError(f"[builder] card slots run from 1 to {BB_MAX_SLOTS} (tank_slot 0 = no tank)")
+
+
 @dataclass(frozen=True)
 class Calibration:
     templates: dict[str, Box] = field(default_factory=dict)
@@ -105,6 +137,7 @@ class Settings:
     session: SessionConfig = field(default_factory=SessionConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     vision: VisionConfig = field(default_factory=VisionConfig)
+    builder: BuilderConfig = field(default_factory=BuilderConfig)
     calibration: Calibration = field(default_factory=Calibration)
 
 
@@ -117,6 +150,7 @@ _SECTIONS: dict[str, type] = {
     "session": SessionConfig,
     "storage": StorageConfig,
     "vision": VisionConfig,
+    "builder": BuilderConfig,
 }
 
 

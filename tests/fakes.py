@@ -156,3 +156,32 @@ class FakePolicy:
     def rest_seconds(self, now):
         self.rest = False
         return self.rest_s
+
+
+class FakeBuilderGame(FakeGame):
+    ACTIONS = {"go_to_builder_base", "open_attack", "drop_one_troop", "surrender", "return_home",
+               "collect_cart", "dismiss_popup", "go_back", "reconnect", "hero_ability",
+               "troop_abilities"}
+
+    def __init__(self, screens):
+        super().__init__(screens)
+        self.damage = []          # values returned by read_damage, one per call (last one repeats)
+        self.result_gold = None
+        self.stages = []
+
+    def deploy_stage(self, stage):
+        self.calls.append("deploy_stage")
+        self.stages.append(stage)
+
+    def read_damage(self):
+        if not self.damage:
+            return None
+        return self.damage.pop(0) if len(self.damage) > 1 else self.damage[0]
+
+    def read_result_gold(self):
+        return self.result_gold
+
+    def __getattr__(self, name):
+        if name in FakeBuilderGame.ACTIONS:
+            return lambda: (self.calls.append(name), name not in self.failing)[1]
+        raise AttributeError(name)

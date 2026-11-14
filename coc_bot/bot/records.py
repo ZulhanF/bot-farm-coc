@@ -1,4 +1,4 @@
-"""Per-attack CSV log (logs/attacks-YYYY-MM-DD.csv): cycle time, damage, preview loot."""
+"""Per-attack CSV logs (logs/attacks-*.csv for the home village, logs/builder-*.csv for the Builder Base)."""
 from __future__ import annotations
 
 import csv
@@ -11,20 +11,25 @@ FIELDS = (
 )
 
 
+BUILDER_FIELDS = ("time", "mode", "cycle_s", "battle_s", "damage_pct", "gold", "stage2")
+
+
 class CsvRecorder:
-    def __init__(self, directory: Path) -> None:
+    def __init__(self, directory: Path, prefix: str = "attacks", fields: tuple[str, ...] = FIELDS) -> None:
         self.directory = directory
+        self.prefix = prefix
+        self.fields = fields
 
     def __call__(self, row: dict) -> None:
         self.directory.mkdir(parents=True, exist_ok=True)
         stamp = row["time"] if isinstance(row["time"], datetime) else datetime.now()
-        path = self.directory / f"attacks-{stamp:%Y-%m-%d}.csv"
+        path = self.directory / f"{self.prefix}-{stamp:%Y-%m-%d}.csv"
         new_file = not path.exists()
         with path.open("a", newline="", encoding="utf-8") as fh:
-            writer = csv.DictWriter(fh, fieldnames=FIELDS)
+            writer = csv.DictWriter(fh, fieldnames=self.fields)
             if new_file:
                 writer.writeheader()
-            writer.writerow({k: _fmt(row.get(k)) for k in FIELDS})
+            writer.writerow({k: _fmt(row.get(k)) for k in self.fields})
 
 
 def _fmt(value) -> str:

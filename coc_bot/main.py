@@ -10,8 +10,8 @@ import cv2
 import numpy as np
 
 from coc_bot import names as N
-from coc_bot.config import Box, Settings, load_calibration, load_settings, save_calibration
-from coc_bot.control import BotRunner, Mode, Paths, connect, load_templates
+from coc_bot.config import BUILDER_MODES, Box, Settings, load_calibration, load_settings, save_calibration
+from coc_bot.control import BotRunner, Mode, Paths, connect, load_templates, with_builder_mode
 from coc_bot.device.adb import AdbError
 from coc_bot.logs import setup_logging
 from coc_bot.vision.report import analyse
@@ -29,7 +29,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("dashboard", help="open the terminal dashboard (default without a command)")
     run = sub.add_parser("run", help="run the bot (Ctrl+C to stop)")
     run.add_argument("--mode", choices=[m.value for m in Mode], default=Mode.HOME.value)
-    sub.add_parser("check", help="list missing calibration items")
+    run.add_argument("--builder-mode", choices=list(BUILDER_MODES), default=None,
+                     help="Builder Base sub-mode (default: [builder] mode in settings.toml)")
+    check = sub.add_parser("check", help="list missing calibration items")
+    check.add_argument("--mode", choices=[m.value for m in Mode], default=Mode.HOME.value)
     shot = sub.add_parser("screenshot", help="save an emulator screenshot")
     shot.add_argument("--out", type=Path)
     vision = sub.add_parser("test-vision", help="analyse a screenshot without tapping")
@@ -69,7 +72,8 @@ def _select_box(image: np.ndarray, title: str) -> Box | None:
 
 
 def cmd_check(args: argparse.Namespace, settings: Settings) -> int:
-    missing = N.missing_calibration(settings, set(_templates(args, settings).names()))
+    missing = N.missing_for_mode(settings, set(_templates(args, settings).names()),
+                                 getattr(args, "mode", Mode.HOME.value))
     if missing:
         print("Missing calibration:")
         for item in missing:
@@ -135,13 +139,16 @@ def cmd_test_vision(args: argparse.Namespace, settings: Settings) -> int:
 
 
 def cmd_run(args: argparse.Namespace, settings: Settings) -> int:
-    missing = N.missing_calibration(settings, set(_templates(args, settings).names()))
+    mode = getattr(args, "mode", Mode.HOME.value)
+    settings = with_builder_mode(settings, Mode(mode), getattr(args, "builder_mode", None))
+    missing = N.missing_for_mode(settings, set(_templates(args, settings).names()), mode)
     if missing:
-        print("Calibration incomplete, run `python -m coc_bot check`. Missing:", ", ".join(missing))
+        print(f"Calibration incomplete, run `python -m coc_bot check --mode {mode}`. Missing:",
+              ", ".join(missing))
         return 2
     log_path = setup_logging(Path("logs"))
     log.info("Logging to %s", log_path)
-    runner = BotRunner(_paths(args), Mode(getattr(args, "mode", Mode.HOME.value)))
+    runner = BotRunner(_paths(args), Mode(mode), getattr(args, "builder_mode", None))
     code = runner.run()
     if code == 3:
         raise AdbError(runner.status().error or "ADB error")
