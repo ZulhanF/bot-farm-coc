@@ -163,3 +163,17 @@ def test_drop_waits_after_selecting_the_card():
     game.sleep = slept.append
     game.drop_one_troop()
     assert any(s >= 0.4 for s in slept)
+
+
+def test_battle_stage_from_map_colour():
+    import cv2
+    import numpy as np
+    game, adb = make()
+    hsv = np.zeros((720, 1280, 3), np.uint8)
+    hsv[...] = (110, 150, 110)
+    adb.image = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    game.capture()
+    assert game.battle_stage() == 2
+    adb.image = np.zeros((720, 1280, 3), np.uint8)
+    game.capture()
+    assert game.battle_stage() == 1

@@ -7,6 +7,7 @@ from typing import Protocol
 import numpy as np
 
 from coc_bot import names as N
+from coc_bot.vision.stage import is_stage2_map
 from coc_bot.vision.templates import Match
 
 
@@ -74,7 +75,9 @@ def detect_screen(image: np.ndarray, templates: TemplateFinder) -> Screen:
 
 def detect_builder_screen(image: np.ndarray, templates: TemplateFinder) -> Screen:
     screen = _detect(image, templates, BUILDER_MARKERS)
-    # Both stages show the same "battle starts in" banner; only stage 2 offers End Battle while preparing.
-    if screen is Screen.BB_PREP and templates.find(image, N.BB_BTN_END_BATTLE) is not None:
+    # Both stages show the same "battle starts in" banner; stage 2 offers End Battle while preparing
+    # and is a dark blue cave instead of a green field (either sign is enough).
+    if screen is Screen.BB_PREP and (templates.find(image, N.BB_BTN_END_BATTLE) is not None
+                                     or is_stage2_map(image)):
         return Screen.BB_STAGE2_PREP
     return screen

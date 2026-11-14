@@ -171,6 +171,7 @@ class FakeBuilderGame(FakeGame):
         self.damage = []          # values returned by read_damage, one per call (last one repeats)
         self.result_gold = None
         self.stages = []
+        self.stage_seen = 1       # what battle_stage() reports (map colour)
 
     def deploy_stage(self, stage):
         self.calls.append("deploy_stage")
@@ -183,6 +184,9 @@ class FakeBuilderGame(FakeGame):
 
     def read_result_gold(self):
         return self.result_gold
+
+    def battle_stage(self):
+        return self.stage_seen
 
     def __getattr__(self, name):
         if name in FakeBuilderGame.ACTIONS:

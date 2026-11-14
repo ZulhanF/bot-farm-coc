@@ -219,3 +219,10 @@ def test_next_battle_counts_again_after_result():
     loop.tick()
     loop.tick()
     assert loop.stats.attacks == 2
+
+
+def test_battle_after_recovery_takes_stage_from_the_map():
+    loop, game, task, _ = gold([Screen.BB_BATTLE])
+    game.stage_seen = 2
+    loop.tick()                 # no stage started (e.g. after a recovery)
+    assert task._stage == 2

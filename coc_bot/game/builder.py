@@ -7,6 +7,7 @@ from coc_bot import names as N
 from coc_bot.config import Point
 from coc_bot.game.actions import Game
 from coc_bot.vision.screens import Screen, detect_builder_screen
+from coc_bot.vision.stage import is_stage2_map
 
 log = logging.getLogger(__name__)
 
@@ -111,6 +112,10 @@ class BuilderGame(Game):
         if tapped and self.wait_for(N.POPUP_OKAY, timeout_s=3.0):
             self.tap_template(N.POPUP_OKAY, fresh=False)
         return tapped
+
+    def battle_stage(self) -> int:
+        """Stage of the battle on screen, from the battlefield colour (green = 1, dark blue = 2)."""
+        return 2 if is_stage2_map(self._image(fresh=False)) else 1
 
     def read_damage(self) -> int | None:
         roi = self.settings.calibration.rois.get(N.ROI_BB_DAMAGE)

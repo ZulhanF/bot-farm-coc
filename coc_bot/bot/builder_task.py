@@ -205,8 +205,9 @@ class BuilderFarmTask:
 
     def _gold_battle(self, now: datetime) -> None:
         cfg = self.cfg
-        if self._stage_started is None:          # e.g. after a recovery: track from now
-            self._stage = max(self._stage, 1)
+        if self._stage_started is None:          # e.g. after a recovery: the map colour tells the stage
+            self._stage = self.game.battle_stage()
+            log.info("Tracking a stage-%d battle already in progress", self._stage)
             self._stage_started = now
             self._last_damage_time = now
         elapsed = (now - self._stage_started).total_seconds()

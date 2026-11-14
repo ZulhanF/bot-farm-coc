@@ -89,3 +89,12 @@ def test_detect_builder_screens_in_priority_order():
     ]
     for visible, expected in cases:
         assert detect_builder_screen(IMG, FakeTemplates(visible)) is expected, visible
+
+
+def test_dark_blue_map_marks_stage2_prep_without_end_battle_button():
+    hsv = np.zeros((720, 1280, 3), np.uint8)
+    hsv[...] = (110, 150, 110)
+    import cv2
+    blue = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    assert detect_builder_screen(blue, FakeTemplates({N.BB_PREP})) is Screen.BB_STAGE2_PREP
+    assert detect_builder_screen(IMG, FakeTemplates({N.BB_PREP})) is Screen.BB_PREP

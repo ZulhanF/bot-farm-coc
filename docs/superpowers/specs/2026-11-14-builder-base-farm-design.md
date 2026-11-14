@@ -156,7 +156,7 @@ Sub-mode juga bisa dipilih lewat `run --builder-mode` dan menu Mode dashboard (`
 `calibration.toml` (dikalibrasi dari screenshot game pengguna):
 
 - Template: `bb_boat`, `bb_attack` (tombol + penanda `BB_HOME`), `bb_btn_find_now`, `bb_searching`
-  (opsional), `bb_prep` (banner persiapan, kedua tahap), `bb_btn_surrender`, `bb_btn_end_battle` (gold; "Akhiri Serangan" — `BB_STAGE2_PREP` = banner persiapan + tombol ini),
+  (opsional), `bb_prep` (banner persiapan, kedua tahap), `bb_btn_surrender`, `bb_btn_end_battle` (gold; "Akhiri Serangan" — `BB_STAGE2_PREP` = banner persiapan + tombol ini **atau** peta biru tua; warna peta juga memberi tahu tahap battle setelah recovery, `coc_bot/vision/stage.py`),
   `bb_btn_return_home` (penanda `BB_RESULT`), `bb_elixir_cart`, `bb_btn_collect`, plus `home_attack`
   dan `popup_okay` yang sudah ada.
 - Titik: `bb_deploy_stage1`, `bb_deploy_stage2` (gold + stage2), `bb_slot_N` (N = 1..8) untuk kartu yang dipakai.
