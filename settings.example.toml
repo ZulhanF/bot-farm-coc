@@ -65,8 +65,9 @@ tank_slot = 2            # gold: Giant (0 = no tank)
 main_slots = [3, 4, 5, 6]  # gold: Night Witch cards
 taps_per_slot = 3
 witch_delay_s = 2.0
-ability_every_s = 3.0    # tap the hero card this often to fire its ability
+ability_every_s = 3.0    # min gap between hero abilities (fired only when the card shows it charged)
 bat_swarm_after_s = 6.0
+bat_swarm_gap_s = 2.0    # pause between one Night Witch's Bat Swarm and the next
 damage_stagnant_s = 12.0
 battle_timeout_s = 150
 stage2 = true

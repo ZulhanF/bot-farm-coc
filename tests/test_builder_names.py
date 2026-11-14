@@ -98,3 +98,11 @@ def test_dark_blue_map_marks_stage2_prep_without_end_battle_button():
     blue = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
     assert detect_builder_screen(blue, FakeTemplates({N.BB_PREP})) is Screen.BB_STAGE2_PREP
     assert detect_builder_screen(IMG, FakeTemplates({N.BB_PREP})) is Screen.BB_PREP
+
+
+def test_alternative_deploy_points_are_valid_optional_names():
+    assert "bb_deploy_stage1_alt1" in N.valid_names("point", (1,))
+    assert "bb_deploy_stage2_alt2" in N.valid_names("point", (1,))
+    items = N.relevant_for_mode(builder(mode="gold"), "builder")
+    assert ("point", "bb_deploy_stage1_alt1") in items
+    assert ("point", "bb_deploy_stage1_alt1") not in N.builder_requirements(builder(mode="gold"))

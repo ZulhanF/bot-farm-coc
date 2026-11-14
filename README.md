@@ -101,7 +101,7 @@ then lists the Builder Base items; `check --mode builder` prints them too.
 |---|---|
 | Buttons | `bb_boat` (home village), `bb_attack`, `bb_btn_find_now`, `bb_btn_surrender`, `bb_btn_return_home`, `bb_elixir_cart`, `bb_btn_collect` |
 | Screens | `bb_prep` ("battle starts in" banner), `bb_btn_end_battle` (gold: *Akhiri Serangan*, also tells stage-2 prep apart) |
-| Deploy | `bb_deploy_stage1`, `bb_deploy_stage2` (gold), `bb_slot_N` (each card you use) |
+| Deploy | `bb_deploy_stage1`, `bb_deploy_stage2` (gold), optional fallbacks `bb_deploy_stageN_alt1/2` (tried in order when a corner is taken), `bb_slot_N` (each card you use) |
 | OCR | `bb_damage` (gold), `bb_result_gold` (optional) |
 
 - **elixir** — Builder Elixir comes from the defense every search opens, so the bot surrenders at once and

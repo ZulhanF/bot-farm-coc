@@ -73,8 +73,17 @@ BB_DEPLOY_STAGE1 = "bb_deploy_stage1"  # the single deploy point on stage 1
 BB_DEPLOY_STAGE2 = "bb_deploy_stage2"  # the single deploy point on stage 2
 
 
+BB_DEPLOY_ALTS = 2                     # optional fallbacks: bb_deploy_stageN_alt1, _alt2
+
+
 def bb_slot(n: int) -> str:
     return f"bb_slot_{n}"
+
+
+def bb_deploy_points(stage: int) -> tuple[str, ...]:
+    """Deploy point names for a stage, tried in order (a corner can be taken by the defender)."""
+    main = BB_DEPLOY_STAGE1 if stage == 1 else BB_DEPLOY_STAGE2
+    return (main,) + tuple(f"{main}_alt{i}" for i in range(1, BB_DEPLOY_ALTS + 1))
 
 
 def troop_slot(n: int) -> str:
@@ -152,7 +161,7 @@ def valid_names(kind: str, troop_slots: tuple[int, ...]) -> tuple[str, ...]:
         return REQUIRED_ROIS + OPTIONAL_ROIS + BB_ROIS
     if kind == "point":
         return (MAP_CLOCK_POINTS + MAP_CORNERS + (MAP_CENTER,)
-                + (BB_DEPLOY_STAGE1, BB_DEPLOY_STAGE2)
+                + bb_deploy_points(1) + bb_deploy_points(2)
                 + tuple(bb_slot(n) for n in range(1, BB_MAX_SLOTS + 1))
                 + tuple(troop_slot(n) for n in troop_slots))
     raise ValueError(f"Unknown kind: {kind}")
@@ -194,6 +203,7 @@ _BB_OPTIONAL = (
     [("template", n) for n in (BB_SEARCHING, BB_BTN_END_BATTLE,
                                POPUP_RELOAD, POPUP_TRY_AGAIN, POPUP_CLOSE)]
     + [("roi", ROI_BB_DAMAGE), ("roi", ROI_BB_RESULT_GOLD)]
+    + [("point", n) for n in bb_deploy_points(1)[1:] + bb_deploy_points(2)[1:]]
 )
 
 

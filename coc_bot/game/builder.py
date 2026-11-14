@@ -6,6 +6,7 @@ import logging
 from coc_bot import names as N
 from coc_bot.config import Point
 from coc_bot.game.actions import Game
+from coc_bot.vision.cards import ability_ready
 from coc_bot.vision.screens import Screen, detect_builder_screen
 from coc_bot.vision.stage import is_stage2_map
 
@@ -19,6 +20,7 @@ CART_THRESHOLD = 0.72  # the cart looks different empty / full (bottles, bubble)
 CART_SCALES = (1.0, 1.4)  # zoom when arriving by boat / the closer default zoom after a battle
 DOCK_SWIPE = (800, 200, 450, 500)  # finger down-left = map moves down-left = the dock (top-right) comes into view
 CARD_SELECT_S = 0.4   # a map tap right after selecting a card is ignored by the game
+DROP_CHECK_S = 0.8    # wait before checking whether the first drop started the battle
 
 
 class BuilderGame(Game):
@@ -75,19 +77,40 @@ class BuilderGame(Game):
         return self.tap_template(N.BB_BTN_FIND_NOW, fresh=False)
 
     # --- deploy ---------------------------------------------------------------
+    def _deploy_points(self, stage: int) -> list[Point]:
+        return [p for name in N.bb_deploy_points(stage) if (p := self._point(name)) is not None]
+
+    def _open_battle(self, slot: int, stage: int) -> Point | None:
+        """Drop the first card at the first deploy point that starts the battle.
+
+        Corners are tried first but the defender may have a building there: a drop on a blocked
+        spot does nothing and the "battle starts in" banner stays, so the next point is tried.
+        """
+        card = self._point(N.bb_slot(slot))
+        points = self._deploy_points(stage)
+        if card is None or not points:
+            log.warning("Card bb_slot_%d or the stage-%d deploy point is not calibrated", slot, stage)
+            return None
+        self.tap(card)
+        self.sleep(CARD_SELECT_S)
+        for point in points:
+            self.tap(self._spread(point))
+            self.sleep(DROP_CHECK_S)
+            if self.templates.find(self.capture(), N.BB_PREP) is None:
+                log.info("Stage %d: deploying at %s", stage, point)
+                return point
+            log.info("Deploy point %s is blocked, trying the next one", point)
+        log.warning("No stage-%d deploy point worked", stage)
+        return None
+
     def drop_one_troop(self) -> bool:
-        target = self._point(N.BB_DEPLOY_STAGE1)
-        if target is None:
-            return False
-        return self._drop(self.settings.builder.troop_slot, target, taps=1)
+        return self._open_battle(self.settings.builder.troop_slot, stage=1) is not None
 
     def deploy_stage(self, stage: int) -> None:
         b = self.settings.builder
-        target = self._point(N.BB_DEPLOY_STAGE1 if stage == 1 else N.BB_DEPLOY_STAGE2)
+        target = self._open_battle(b.hero_slot, stage)
         if target is None:
-            log.warning("Deploy point for stage %d is not calibrated", stage)
             return
-        self._drop(b.hero_slot, target, taps=1)
         self.sleep(1.0)
         if b.tank_slot > 0:
             self._drop(b.tank_slot, target, b.taps_per_slot)
@@ -95,13 +118,20 @@ class BuilderGame(Game):
         for slot in b.main_slots + (b.stage2_slots if stage == 2 else ()):
             self._drop(slot, target, b.taps_per_slot)
 
-    def hero_ability(self) -> None:
-        """Tap the hero card: fires the ability when charged, does nothing otherwise."""
-        self._tap_card(self.settings.builder.hero_slot)
+    def hero_ability(self) -> bool:
+        """Fire the hero ability if its card shows it charged (pale card = still charging)."""
+        card = self._point(N.bb_slot(self.settings.builder.hero_slot))
+        if card is None or not ability_ready(self.capture(), card):
+            return False
+        self.tap(card)
+        return True
 
     def troop_abilities(self) -> None:
         """Tap the deployed Night Witch cards once (Bat Swarm)."""
-        for slot in self.settings.builder.main_slots:
+        b = self.settings.builder
+        for i, slot in enumerate(b.main_slots):
+            if i:
+                self.sleep(b.bat_swarm_gap_s)
             self._tap_card(slot)
 
     # --- battle ---------------------------------------------------------------

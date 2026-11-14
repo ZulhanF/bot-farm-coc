@@ -177,3 +177,73 @@ def test_battle_stage_from_map_colour():
     adb.image = np.zeros((720, 1280, 3), np.uint8)
     game.capture()
     assert game.battle_stage() == 1
+
+
+class PrepUntilTaps(FakeTemplates):
+    """The prep banner stays visible until the adb has seen `taps` taps (= the battle started)."""
+
+    def __init__(self, adb, taps, visible=()):
+        super().__init__(set(visible) | {N.BB_PREP})
+        self.adb, self.taps = adb, taps
+
+    def find(self, image, name, threshold=None, anywhere=False, scales=(1.0,)):
+        if name == N.BB_PREP and len(self.adb.taps()) >= self.taps:
+            return None
+        return super().find(image, name, threshold)
+
+
+def with_alts(game):
+    pts = dict(game.settings.calibration.points)
+    pts[N.BB_DEPLOY_STAGE1 + "_alt1"] = (1200, 400)
+    pts[N.BB_DEPLOY_STAGE1 + "_alt2"] = (200, 300)
+    game.settings = replace(game.settings, calibration=replace(game.settings.calibration, points=pts))
+
+
+def test_blocked_corner_falls_back_to_next_point():
+    game, adb = make(mode="gold", hero_slot=1, tank_slot=2, main_slots=(3,), taps_per_slot=1)
+    with_alts(game)
+    game.templates = PrepUntilTaps(adb, taps=3)    # card, corner (blocked), alt1 -> battle started
+    game.deploy_stage(1)
+    taps = adb.taps()
+    assert near(taps[1], POINTS[N.BB_DEPLOY_STAGE1]) and near(taps[2], (1200, 400))
+    drops = [t for t in taps[3:] if t[1] != 625 and t[1] != 680]
+    assert drops and all(near(t, (1200, 400)) for t in drops)
+
+
+def test_all_points_blocked_deploys_nothing_more():
+    game, adb = make(mode="gold", hero_slot=1, tank_slot=2, main_slots=(3,))
+    with_alts(game)
+    game.templates = PrepUntilTaps(adb, taps=99)
+    game.deploy_stage(1)
+    assert len(adb.taps()) == 1 + 3                 # hero card + three tried points
+
+
+def test_elixir_drop_uses_the_fallback_too():
+    game, adb = make(troop_slot=1)
+    with_alts(game)
+    game.templates = PrepUntilTaps(adb, taps=3)
+    assert game.drop_one_troop() is True
+    assert near(adb.taps()[2], (1200, 400))
+
+
+def test_bat_swarm_waits_between_witches():
+    slept = []
+    game, adb = make(mode="gold", main_slots=(3, 4, 5), bat_swarm_gap_s=2.0)
+    game.sleep = slept.append
+    game.troop_abilities()
+    assert slept.count(2.0) == 2 and len(adb.taps()) == 3
+
+
+def test_hero_ability_not_tapped_while_charging():
+    import cv2
+    import numpy as np
+    game, adb = make(mode="gold", hero_slot=1)
+    hsv = np.zeros((720, 1280, 3), np.uint8)
+    hsv[...] = (0, 20, 230)                     # everything pale = card still charging
+    adb.image = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    assert game.hero_ability() is False
+    assert adb.taps() == []
+    hsv[...] = (135, 200, 200)                  # full colour = ready
+    adb.image = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    assert game.hero_ability() is True
+    assert adb.taps() == [POINTS[N.bb_slot(1)]]

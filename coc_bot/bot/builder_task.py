@@ -189,6 +189,12 @@ class BuilderFarmTask:
         self._abilities_used = False
 
     def _on_stage2_prep(self, now: datetime) -> None:
+        if not self._in_battle:
+            # the first prep of a battle is always stage 1; the dark blue search clouds can make
+            # stage-1 prep look like the stage-2 cave for a moment
+            log.info("Stage-2 look before any stage 1: treating it as stage-1 prep")
+            self._on_prep(now)
+            return
         if self.mode == "elixir" or not self.cfg.stage2:
             log.info("Stage 2 reached, ending the battle (stage2 off)")
             self.loop.act(self.game.surrender())
@@ -212,9 +218,11 @@ class BuilderFarmTask:
             self._last_damage_time = now
         elapsed = (now - self._stage_started).total_seconds()
 
+        # the card says when the ability is charged; ability_every_s only keeps a gap after firing
         if self._last_ability is None or (now - self._last_ability).total_seconds() >= cfg.ability_every_s:
-            self.game.hero_ability()
-            self._last_ability = now
+            if self.game.hero_ability():
+                log.info("Hero ability fired")
+                self._last_ability = now
         if not self._abilities_used and elapsed >= cfg.bat_swarm_after_s:
             self.game.troop_abilities()
             self._abilities_used = True

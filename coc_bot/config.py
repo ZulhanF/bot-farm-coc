@@ -96,8 +96,9 @@ class BuilderConfig:
     main_slots: tuple[int, ...] = (3, 4, 5, 6)   # gold: Night Witch cards
     taps_per_slot: int = 3           # taps on the deploy point per card (empties the card)
     witch_delay_s: float = 2.0       # wait after the tank before the Night Witches
-    ability_every_s: float = 3.0     # tap the hero card this often (does nothing until charged)
+    ability_every_s: float = 3.0     # min gap between hero abilities; fired only when the card shows charged
     bat_swarm_after_s: float = 6.0   # tap the Night Witch cards once (Bat Swarm) after this long
+    bat_swarm_gap_s: float = 2.0     # pause between one Night Witch's Bat Swarm and the next
     damage_stagnant_s: float = 12.0  # end the stage if the damage % stops rising this long
     battle_timeout_s: int = 150      # per stage (the game's own timer is 2 minutes)
     stage2: bool = True              # attack stage 2 when it appears

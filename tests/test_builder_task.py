@@ -178,14 +178,16 @@ def test_gold_battle_without_damage_reading_waits_for_timeout():
 
 def test_stage2_prep_deploys_stage2():
     loop, game, task, _ = gold([Screen.BB_STAGE2_PREP])
+    task._on_prep(loop.clock())          # stage 1 of this battle
     loop.tick()
-    assert game.stages == [2] and loop.stats.stage2 == 1
+    assert game.stages == [1, 2] and loop.stats.stage2 == 1
 
 
 def test_stage2_off_ends_battle():
     loop, game, task, _ = gold([Screen.BB_STAGE2_PREP], stage2=False)
+    task._on_prep(loop.clock())          # stage 1 of this battle
     loop.tick()
-    assert game.stages == [] and game.count("surrender") == 1
+    assert game.stages == [1] and game.count("surrender") == 1
 
 
 def test_stage2_recorded_in_result():
@@ -226,3 +228,17 @@ def test_battle_after_recovery_takes_stage_from_the_map():
     game.stage_seen = 2
     loop.tick()                 # no stage started (e.g. after a recovery)
     assert task._stage == 2
+
+
+def test_stage2_prep_before_any_stage1_is_treated_as_stage1():
+    # search clouds are dark blue: the first prep of a battle can look like stage 2
+    loop, game, task, _ = gold([Screen.BB_STAGE2_PREP])
+    loop.tick()
+    assert game.stages == [1] and loop.stats.attacks == 1 and loop.stats.stage2 == 0
+
+
+def test_real_stage2_after_stage1():
+    loop, game, task, _ = gold([Screen.BB_PREP, Screen.BB_STAGE2_PREP])
+    loop.tick()
+    loop.tick()
+    assert game.stages == [1, 2] and loop.stats.stage2 == 1
